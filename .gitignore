@@ -1,0 +1,69 @@
+# Build output
+build/
+out/
+bin/
+obj/
+cmake-build-*/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+x64/
+x86/
+Win32/
+Debug/
+Release/
+RelWithDebInfo/
+MinSizeRel/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+
+# Executable and binary outputs
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.obj
+*.exp
+
+# Media and generated samples
+*.wav
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.flac
+*.aac
+*.mp3
+
+# NVIDIA SDKs, models, features, and redistributables
+Audio_Effects_SDK*/
+NVIDIA_Audio_Effects_SDK*/
+nvafx*/
+models/
+features/
+sdk/
+third_party/nvidia/
+*.zip
+*.7z
+*.tar
+*.tar.gz
+
+# Local environment and configuration
+.env
+.env.*
+*.local
+local.*
+*.log
