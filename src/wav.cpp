@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <fstream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -13,24 +14,30 @@ namespace {
 
 constexpr std::uint16_t kFormatPcm = 1;
 constexpr std::uint16_t kFormatIeeeFloat = 3;
+constexpr std::uint16_t kFormatExtensible = 0xfffe;
 constexpr std::uint16_t kSupportedPcmBits = 16;
 constexpr std::uint16_t kSupportedFloatBits = 32;
+constexpr std::uint32_t kWaveHeaderSize = 8;
+
+constexpr std::array<unsigned char, 16> kPcmSubformat = {
+    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00,
+    0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71,
+};
+
+constexpr std::array<unsigned char, 16> kFloatSubformat = {
+    0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00,
+    0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71,
+};
 
 struct FormatChunk {
     std::uint16_t audio_format = 0;
+    std::uint16_t effective_format = 0;
     std::uint16_t channels = 0;
     std::uint32_t sample_rate = 0;
     std::uint16_t block_align = 0;
     std::uint16_t bits_per_sample = 0;
+    std::uint16_t valid_bits_per_sample = 0;
 };
-
-bool is_supported_sample_rate(std::uint32_t sample_rate) {
-    return sample_rate == 16000 || sample_rate == 48000;
-}
-
-bool is_supported_channels(std::uint16_t channels) {
-    return channels == 1 || channels == 2;
-}
 
 std::runtime_error wav_error(const std::string& path, const std::string& message) {
     return std::runtime_error(path + ": " + message);
@@ -98,6 +105,20 @@ void write_u32(std::ostream& output, std::uint32_t value) {
     output.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
 }
 
+std::uintmax_t file_size(std::ifstream& input, const std::string& path) {
+    const auto current = input.tellg();
+    input.seekg(0, std::ios::end);
+    if (!input) {
+        throw wav_error(path, "failed to determine file size");
+    }
+    const auto end = input.tellg();
+    input.seekg(current, std::ios::beg);
+    if (!input || end < 0) {
+        throw wav_error(path, "failed to determine file size");
+    }
+    return static_cast<std::uintmax_t>(end);
+}
+
 void write_f32(std::ostream& output, float value) {
     std::uint32_t bits = 0;
     static_assert(sizeof(bits) == sizeof(value), "float must be 32-bit");
@@ -126,11 +147,45 @@ FormatChunk read_format_chunk(std::istream& input, std::uint32_t size, const std
 
     FormatChunk format;
     format.audio_format = read_u16(input, path);
+    format.effective_format = format.audio_format;
     format.channels = read_u16(input, path);
     format.sample_rate = read_u32(input, path);
     (void)read_u32(input, path);
     format.block_align = read_u16(input, path);
     format.bits_per_sample = read_u16(input, path);
+    format.valid_bits_per_sample = format.bits_per_sample;
+
+    if (format.audio_format == kFormatExtensible) {
+        if (size < 40) {
+            throw wav_error(path, "malformed WAVE_FORMAT_EXTENSIBLE fmt chunk");
+        }
+
+        const std::uint16_t extension_size = read_u16(input, path);
+        if (extension_size < 22) {
+            throw wav_error(path, "malformed WAVE_FORMAT_EXTENSIBLE extension");
+        }
+
+        format.valid_bits_per_sample = read_u16(input, path);
+        (void)read_u32(input, path);
+
+        std::array<unsigned char, 16> subformat{};
+        read_exact(input, reinterpret_cast<char*>(subformat.data()), subformat.size(), path);
+
+        if (subformat == kPcmSubformat) {
+            format.effective_format = kFormatPcm;
+        } else if (subformat == kFloatSubformat) {
+            format.effective_format = kFormatIeeeFloat;
+        } else {
+            throw wav_error(path, "unsupported WAVE_FORMAT_EXTENSIBLE subformat");
+        }
+
+        const std::uint32_t consumed = 40;
+        const std::uint32_t remaining = size - consumed;
+        if (remaining > 0) {
+            skip_chunk_data(input, remaining, path);
+        }
+        return format;
+    }
 
     const std::uint32_t remaining = size - 16;
     if (remaining > 0) {
@@ -143,17 +198,19 @@ FormatChunk read_format_chunk(std::istream& input, std::uint32_t size, const std
 }
 
 void validate_format(const FormatChunk& format, const std::string& path) {
-    if (!is_supported_channels(format.channels)) {
+    if (!is_supported_wav_channel_count(format.channels)) {
         throw wav_error(path, "unsupported channel count; expected mono or stereo");
     }
 
-    if (!is_supported_sample_rate(format.sample_rate)) {
+    if (!is_supported_wav_sample_rate(format.sample_rate)) {
         throw wav_error(path, "unsupported sample rate; expected 16000 or 48000 Hz");
     }
 
-    const bool pcm16 = format.audio_format == kFormatPcm && format.bits_per_sample == kSupportedPcmBits;
+    const bool pcm16 = format.effective_format == kFormatPcm && format.bits_per_sample == kSupportedPcmBits &&
+                       format.valid_bits_per_sample == kSupportedPcmBits;
     const bool float32 =
-        format.audio_format == kFormatIeeeFloat && format.bits_per_sample == kSupportedFloatBits;
+        format.effective_format == kFormatIeeeFloat && format.bits_per_sample == kSupportedFloatBits &&
+        format.valid_bits_per_sample == kSupportedFloatBits;
 
     if (!pcm16 && !float32) {
         throw wav_error(path, "unsupported format; expected PCM signed 16-bit or IEEE float 32-bit");
@@ -182,7 +239,7 @@ AudioBuffer read_data_chunk(std::istream& input, std::uint32_t size, const Forma
 
     for (std::uint32_t frame = 0; frame < frame_count; ++frame) {
         for (std::uint16_t channel = 0; channel < audio.channels; ++channel) {
-            if (format.audio_format == kFormatPcm) {
+            if (format.effective_format == kFormatPcm) {
                 audio.samples[channel][frame] =
                     static_cast<float>(read_i16(input, path)) / 32768.0F;
             } else {
@@ -199,11 +256,11 @@ AudioBuffer read_data_chunk(std::istream& input, std::uint32_t size, const Forma
 }
 
 void validate_audio_for_write(const AudioBuffer& audio, const std::string& path) {
-    if (!is_supported_channels(audio.channels)) {
+    if (!is_supported_wav_channel_count(audio.channels)) {
         throw wav_error(path, "unsupported channel count for write; expected mono or stereo");
     }
 
-    if (!is_supported_sample_rate(audio.sample_rate)) {
+    if (!is_supported_wav_sample_rate(audio.sample_rate)) {
         throw wav_error(path, "unsupported sample rate for write; expected 16000 or 48000 Hz");
     }
 
@@ -225,17 +282,38 @@ void validate_audio_for_write(const AudioBuffer& audio, const std::string& path)
 
 }  // namespace
 
+bool is_supported_wav_sample_rate(std::uint32_t sample_rate) {
+    return sample_rate == 16000 || sample_rate == 48000;
+}
+
+bool is_supported_wav_channel_count(std::uint16_t channels) {
+    return channels == 1 || channels == 2;
+}
+
 AudioBuffer read_wav_file(const std::string& path) {
     std::ifstream input(path, std::ios::binary);
     if (!input) {
         throw wav_error(path, "failed to open input WAV file");
     }
 
+    const std::uintmax_t total_size = file_size(input, path);
+
+    if (total_size < 12) {
+        throw wav_error(path, "truncated file");
+    }
+
     if (!tag_equals(read_tag(input, path), "RIFF")) {
         throw wav_error(path, "unsupported container; expected RIFF");
     }
 
-    (void)read_u32(input, path);
+    const std::uint32_t riff_size = read_u32(input, path);
+    if (riff_size < 4) {
+        throw wav_error(path, "malformed RIFF size");
+    }
+    if (static_cast<std::uintmax_t>(riff_size) > total_size - kWaveHeaderSize) {
+        throw wav_error(path, "truncated file");
+    }
+    const std::uintmax_t riff_end = static_cast<std::uintmax_t>(riff_size) + kWaveHeaderSize;
 
     if (!tag_equals(read_tag(input, path), "WAVE")) {
         throw wav_error(path, "unsupported file type; expected WAVE");
@@ -246,9 +324,15 @@ AudioBuffer read_wav_file(const std::string& path) {
     FormatChunk format;
     AudioBuffer audio;
 
-    while (input.peek() != std::char_traits<char>::eof()) {
+    while (static_cast<std::uintmax_t>(input.tellg()) < riff_end) {
         const auto chunk_id = read_tag(input, path);
         const std::uint32_t chunk_size = read_u32(input, path);
+        const auto chunk_data_start = input.tellg();
+        const std::uintmax_t padded_chunk_size = chunk_size + (chunk_size % 2U);
+        if (chunk_data_start < 0 ||
+            static_cast<std::uintmax_t>(chunk_data_start) + padded_chunk_size > riff_end) {
+            throw wav_error(path, "truncated file");
+        }
 
         if (tag_equals(chunk_id, "fmt ")) {
             format = read_format_chunk(input, chunk_size, path);
@@ -279,14 +363,20 @@ AudioBuffer read_wav_file(const std::string& path) {
 void write_float_wav_file(const std::string& path, const AudioBuffer& audio) {
     validate_audio_for_write(audio, path);
 
-    const std::uint32_t frame_count = audio.samples.empty()
+    const std::uint64_t frame_count = audio.samples.empty()
                                           ? 0U
-                                          : static_cast<std::uint32_t>(audio.samples.front().size());
+                                          : static_cast<std::uint64_t>(audio.samples.front().size());
     const std::uint16_t bytes_per_sample = 4;
     const std::uint16_t block_align = static_cast<std::uint16_t>(audio.channels * bytes_per_sample);
     const std::uint32_t byte_rate = audio.sample_rate * block_align;
-    const std::uint32_t data_size = frame_count * block_align;
-    const std::uint32_t riff_size = 4 + (8 + 16) + (8 + data_size);
+    const std::uint64_t data_size_64 = frame_count * block_align;
+    const std::uint64_t riff_size_64 = 4 + (8 + 16) + (8 + data_size_64);
+    if (data_size_64 > std::numeric_limits<std::uint32_t>::max() ||
+        riff_size_64 > std::numeric_limits<std::uint32_t>::max()) {
+        throw wav_error(path, "WAV output would exceed RIFF size limits");
+    }
+    const auto data_size = static_cast<std::uint32_t>(data_size_64);
+    const auto riff_size = static_cast<std::uint32_t>(riff_size_64);
 
     std::ofstream output(path, std::ios::binary);
     if (!output) {
@@ -307,7 +397,7 @@ void write_float_wav_file(const std::string& path, const AudioBuffer& audio) {
     output.write("data", 4);
     write_u32(output, data_size);
 
-    for (std::uint32_t frame = 0; frame < frame_count; ++frame) {
+    for (std::uint64_t frame = 0; frame < frame_count; ++frame) {
         for (std::uint16_t channel = 0; channel < audio.channels; ++channel) {
             write_f32(output, audio.samples[channel][frame]);
         }

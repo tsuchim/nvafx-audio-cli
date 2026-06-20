@@ -42,7 +42,7 @@ SdkProbeResult probe_sdk_root(const std::string& root) {
     }
 
     const std::filesystem::path root_path(root);
-    result.exists = std::filesystem::exists(root_path);
+    result.exists = std::filesystem::is_directory(root_path);
 
     const std::vector<std::string> expected = {
         "include",
@@ -59,6 +59,11 @@ SdkProbeResult probe_sdk_root(const std::string& root) {
             result.missing_subpaths.push_back(subpath);
         }
     }
+
+    const bool has_include = std::filesystem::is_directory(root_path / "include");
+    const bool has_link_or_runtime =
+        std::filesystem::is_directory(root_path / "lib") || std::filesystem::is_directory(root_path / "bin");
+    result.structurally_plausible = result.exists && has_include && has_link_or_runtime;
 
     return result;
 }

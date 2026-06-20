@@ -30,7 +30,11 @@ This project is not sponsored, endorsed, or approved by NVIDIA. NVIDIA, Maxine, 
 
 - `main` is release-only.
 - `devel` is the development integration branch.
-- Development pull requests target `devel`.
+- Intermediate development is integrated into `devel` without development pull requests.
+- Release pull requests are only from `devel` to `main`.
+- GitHub Actions are reserved for `devel` to `main` release PR guardrails.
+- Routine development validation is local-only; CI protects `main` and does not replace local testing.
+- Copilot review and bot review must not be requested.
 
 ## Current WAV Support
 
@@ -38,6 +42,7 @@ The current WAV foundation supports only the subset intended for early ffmpeg-ge
 
 - RIFF/WAVE.
 - PCM signed 16-bit and IEEE float 32-bit.
+- WAVE_FORMAT_EXTENSIBLE PCM signed 16-bit and IEEE float 32-bit.
 - Mono and stereo.
 - 16000 Hz and 48000 Hz.
 - Internal planar `float` audio representation.
@@ -65,8 +70,11 @@ nvafx-audio-cli --check-sdk --sdk-root C:\Path\To\AFX
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build -C Release --output-on-failure
+.\scripts\check_repo_hygiene.ps1
 ```
+
+The main release gate runs on pull requests targeting `main` only. It performs a clean Windows build, CTest guardrails, repository hygiene checks, and CLI public-contract checks without requiring NVIDIA Audio Effects SDK.
 
 ## Current Status
 
-The CLI, SDK discovery checks, and narrow WAV I/O foundation are implemented. SDK processing is intentionally not implemented yet and returns a non-zero exit code when requested. The intended next step is actual AFX binding after the WAV foundation is merged into `devel`.
+The CLI, SDK discovery checks, and narrow WAV I/O foundation are implemented. SDK processing is intentionally not implemented yet and returns a non-zero exit code when requested. The intended next step is actual AFX binding after the hardened WAV foundation is integrated in `devel`.

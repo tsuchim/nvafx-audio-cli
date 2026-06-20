@@ -3,6 +3,7 @@
 #include "sdk_discovery.hpp"
 #include "wav.hpp"
 
+#include <charconv>
 #include <cmath>
 #include <iostream>
 #include <optional>
@@ -68,9 +69,11 @@ std::string require_value(int& index, int argc, char* argv[], const std::string&
 }
 
 int parse_int(const std::string& value, const std::string& option) {
-    std::size_t consumed = 0;
-    const int parsed = std::stoi(value, &consumed);
-    if (consumed != value.size() || parsed <= 0) {
+    int parsed = 0;
+    const char* begin = value.data();
+    const char* end = value.data() + value.size();
+    const auto [ptr, ec] = std::from_chars(begin, end, parsed);
+    if (value.empty() || ec != std::errc() || ptr != end || parsed <= 0) {
         throw std::runtime_error(option + " must be a positive integer");
     }
 
@@ -82,9 +85,11 @@ int parse_int(const std::string& value, const std::string& option) {
 }
 
 double parse_double(const std::string& value, const std::string& option) {
-    std::size_t consumed = 0;
-    const double parsed = std::stod(value, &consumed);
-    if (consumed != value.size() || !std::isfinite(parsed) || parsed < 0.0) {
+    double parsed = 0.0;
+    const char* begin = value.data();
+    const char* end = value.data() + value.size();
+    const auto [ptr, ec] = std::from_chars(begin, end, parsed);
+    if (value.empty() || ec != std::errc() || ptr != end || !std::isfinite(parsed) || parsed < 0.0) {
         throw std::runtime_error(option + " must be a non-negative finite number");
     }
 
@@ -135,6 +140,20 @@ bool has_processing_options(const Options& options) {
     return options.input || options.output || options.effect || options.sample_rate || options.intensity;
 }
 
+void validate_mode(const Options& options) {
+    if (options.check_sdk && options.dry_run) {
+        throw std::runtime_error("--check-sdk and --dry-run cannot be used together");
+    }
+
+    if (options.check_sdk && has_processing_options(options)) {
+        throw std::runtime_error("--check-sdk cannot be combined with processing options");
+    }
+
+    if (options.sdk_root && !options.check_sdk && !options.dry_run && !has_processing_options(options)) {
+        throw std::runtime_error("--sdk-root requires --check-sdk, --dry-run, or processing options");
+    }
+}
+
 void require_processing_triplet(const Options& options) {
     if (!options.input || !options.output || !options.effect) {
         throw std::runtime_error("--input, --output, and --effect are required for processing");
@@ -144,6 +163,8 @@ void require_processing_triplet(const Options& options) {
 void print_sdk_probe(const SdkProbeResult& probe) {
     std::cout << "SDK root: " << (probe.root.empty() ? "<not set>" : probe.root) << "\n";
     std::cout << "Path exists: " << (probe.exists ? "yes" : "no") << "\n";
+    std::cout << "SDK-like structure: " << (probe.structurally_plausible ? "plausible" : "incomplete")
+              << "\n";
 
     if (!probe.present_subpaths.empty()) {
         std::cout << "Present SDK-like subpaths:";
@@ -171,7 +192,7 @@ int check_sdk(const Options& options) {
 
     const SdkProbeResult probe = probe_sdk_root(root);
     print_sdk_probe(probe);
-    return probe.exists ? 0 : 2;
+    return probe.structurally_plausible ? 0 : 2;
 }
 
 int dry_run(const Options& options) {
@@ -220,6 +241,7 @@ int process(const Options& options) {
 int run_cli(int argc, char* argv[]) {
     try {
         const Options options = parse_options(argc, argv);
+        validate_mode(options);
 
         if (options.help) {
             print_help();
@@ -246,11 +268,6 @@ int run_cli(int argc, char* argv[]) {
 
         if (has_processing_options(options)) {
             return process(options);
-        }
-
-        if (options.sdk_root) {
-            std::cerr << "Error: --sdk-root requires --check-sdk, --dry-run, or processing options.\n";
-            return 2;
         }
 
         print_help();

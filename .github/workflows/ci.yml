@@ -1,17 +1,12 @@
-name: CI
+name: Main Release Gate
 
 on:
-  push:
-    branches:
-      - main
-      - devel
   pull_request:
     branches:
       - main
-      - devel
 
 jobs:
-  build-windows:
+  main-release-gate:
     runs-on: windows-latest
 
     steps:
@@ -26,6 +21,9 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Repository hygiene
+        run: .\scripts\check_repo_hygiene.ps1
 
       - name: Verify help
         run: .\build\Release\nvafx-audio-cli.exe --help
