@@ -1,6 +1,6 @@
 # Initial Design
 
-`nvafx-audio-cli` is a small source-only command-line project for future offline WAV processing with NVIDIA Audio Effects SDK.
+`nvafx-audio-cli` is a small Windows-first command-line project for offline WAV processing with NVIDIA Audio Effects SDK.
 
 ## Scope
 
@@ -13,6 +13,7 @@
 - Operates on WAV files only.
 - Does not vendor NVIDIA SDK binaries, models, AI features, redistributables, installers, generated media, or sample media.
 - Does not hardcode local NVIDIA SDK paths.
+- Uses the official external NVIDIA Maxine AFX SDK API repository as a local build dependency only.
 
 ## Branch Policy
 
@@ -27,10 +28,10 @@
 - CI exists to protect `main`, not to replace local development testing.
 - Copilot review and bot review must not be requested.
 
-## Future CLI Shape
+## CLI Shape
 
 ```powershell
-nvafx-audio-cli --input in.wav --output out.wav --effect denoiser --sample-rate 48000 --intensity 1.0
+nvafx-audio-cli --input in.wav --output out.wav --effect denoiser --sample-rate 48000 --intensity 1.0 --model denoiser_48k.trtpkg --runtime-root C:\Path\To\NVIDIA-Audio-Effects-SDK
 ```
 
 Initial accepted effect names:
@@ -39,18 +40,19 @@ Initial accepted effect names:
 - `dereverb`
 - `dereverb_denoiser`
 
-## SDK Discovery
+## SDK Build And Discovery
 
-Future SDK-backed processing should discover the NVIDIA Audio Effects SDK through one or both of:
+The default build is SDK-free. SDK processing is enabled only when configured with:
 
-- `--sdk-root <path>`
-- `AFX_SDK_ROOT` environment variable
+- `NVAFX_ENABLE_SDK=ON`
+- `NVAFX_API_ROOT=<external Maxine-AFX-SDK\nvafx path>`
+- `NVAFX_RUNTIME_ROOT=<installed runtime path>`
 
-Local development paths must remain outside committed source and must not be hardcoded.
+If CMake cache variables are absent, `NVAFX_API_ROOT` and `NVAFX_RUNTIME_ROOT` environment variables are accepted. `AFX_SDK_ROOT` remains a runtime-root compatibility fallback when useful. Local development paths must remain outside committed source and must not be hardcoded.
 
-`--check-sdk` resolves the SDK root from `--sdk-root` or `AFX_SDK_ROOT`, checks whether the path exists, and reports SDK-like subpaths such as `include`, `lib`, `bin`, and `models`. The SDK is not required for `--help`, `--version`, tests, or CI.
+`--check-sdk` resolves API and runtime roots, checks structure, reports headers, import libraries, runtime DLLs, model area, and detected model files. It does not load SDK DLLs and does not claim processing will succeed.
 
-A structurally plausible SDK root currently means an existing directory with `include` and either `lib` or `bin`. The probe reports missing and present SDK-like subpaths but does not load or call the SDK.
+A structurally plausible setup has `include\nvAudioEffects.h`, `lib\NVAudioEffects.lib`, `NVAudioEffects.dll`, and a `models` directory.
 
 ## Dry Run
 
@@ -87,6 +89,8 @@ The release gate is intentionally minimal but checks guardrails:
 
 Development branches should run the same checks locally instead of using GitHub Actions as routine confirmation.
 
-## Next Step
+## Processing
 
-After the WAV foundation is merged into `devel`, the intended next step is actual NVIDIA AFX SDK binding behind the existing CLI and WAV abstractions. That work must still avoid vendoring SDK binaries, models, features, redistributables, installers, archives, generated media, or sample media.
+The SDK adapter is isolated in `src/afx_sdk.cpp` and `src/afx_sdk.hpp`. All direct NVIDIA includes and SDK calls stay there. Processing reads WAV into planar float buffers, loads the requested SDK effect with an explicit `--model`, queries SDK frame size, sample rate, and channel constraints, processes padded frames, trims the final output to the original frame count, and writes 32-bit float WAV.
+
+Mono processing is supported for the tested installed models. Stereo is accepted by the WAV reader but rejected for SDK processing when the loaded effect/model reports mono-only input and output channels. The CLI does not process stereo channels independently because the SDK effect contract does not document that as equivalent.

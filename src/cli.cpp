@@ -1,10 +1,12 @@
 #include "cli.hpp"
 
+#include "afx_sdk.hpp"
 #include "sdk_discovery.hpp"
 #include "wav.hpp"
 
 #include <charconv>
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 #include <optional>
 #include <stdexcept>
@@ -26,6 +28,9 @@ struct Options {
     std::optional<int> sample_rate;
     std::optional<double> intensity;
     std::optional<std::string> sdk_root;
+    std::optional<std::string> api_root;
+    std::optional<std::string> runtime_root;
+    std::optional<std::string> model;
 };
 
 void print_help() {
@@ -35,9 +40,10 @@ void print_help() {
         << "Usage:\n"
         << "  nvafx-audio-cli --help\n"
         << "  nvafx-audio-cli --version\n"
-        << "  nvafx-audio-cli --check-sdk [--sdk-root path]\n"
+        << "  nvafx-audio-cli --check-sdk [--api-root path] [--runtime-root path]\n"
         << "  nvafx-audio-cli --input in.wav --output out.wav --effect denoiser "
-           "--sample-rate 48000 --intensity 1.0 [--sdk-root path] [--dry-run]\n\n"
+           "--sample-rate 48000 --intensity 1.0 --model model.trtpkg "
+           "[--runtime-root path] [--dry-run]\n\n"
         << "Options:\n"
         << "  --help                 Show this help text.\n"
         << "  --version              Show version information.\n"
@@ -45,10 +51,13 @@ void print_help() {
         << "  --output <path>        Output WAV file.\n"
         << "  --effect <name>        denoiser, dereverb, or dereverb_denoiser.\n"
         << "  --sample-rate <hz>     16000 or 48000.\n"
-        << "  --intensity <value>    Non-negative finite effect intensity.\n"
-        << "  --sdk-root <path>      NVIDIA Audio Effects SDK root or use AFX_SDK_ROOT.\n"
+        << "  --intensity <value>    Finite effect intensity from 0.0 through 1.0.\n"
+        << "  --model <path>         NVIDIA AFX model file for processing.\n"
+        << "  --api-root <path>      External Maxine AFX API root for --check-sdk.\n"
+        << "  --runtime-root <path>  Installed NVIDIA Audio Effects SDK runtime root.\n"
+        << "  --sdk-root <path>      Compatibility alias for --runtime-root.\n"
         << "  --dry-run              Validate and print the planned operation without output.\n"
-        << "  --check-sdk            Check the SDK root path and expected subpaths.\n";
+        << "  --check-sdk            Check API/runtime SDK roots and expected files.\n";
 }
 
 bool is_accepted_effect(const std::string& effect) {
@@ -89,8 +98,9 @@ double parse_double(const std::string& value, const std::string& option) {
     const char* begin = value.data();
     const char* end = value.data() + value.size();
     const auto [ptr, ec] = std::from_chars(begin, end, parsed);
-    if (value.empty() || ec != std::errc() || ptr != end || !std::isfinite(parsed) || parsed < 0.0) {
-        throw std::runtime_error(option + " must be a non-negative finite number");
+    if (value.empty() || ec != std::errc() || ptr != end || !std::isfinite(parsed) || parsed < 0.0 ||
+        parsed > 1.0) {
+        throw std::runtime_error(option + " must be a finite number from 0.0 through 1.0");
     }
 
     return parsed;
@@ -122,6 +132,12 @@ Options parse_options(int argc, char* argv[]) {
             options.intensity = parse_double(require_value(i, argc, argv, arg), arg);
         } else if (arg == "--sdk-root") {
             options.sdk_root = require_value(i, argc, argv, arg);
+        } else if (arg == "--api-root") {
+            options.api_root = require_value(i, argc, argv, arg);
+        } else if (arg == "--runtime-root") {
+            options.runtime_root = require_value(i, argc, argv, arg);
+        } else if (arg == "--model") {
+            options.model = require_value(i, argc, argv, arg);
         } else {
             throw std::runtime_error("Unknown option: " + arg);
         }
@@ -137,7 +153,8 @@ Options parse_options(int argc, char* argv[]) {
 }
 
 bool has_processing_options(const Options& options) {
-    return options.input || options.output || options.effect || options.sample_rate || options.intensity;
+    return options.input || options.output || options.effect || options.sample_rate || options.intensity ||
+           options.model;
 }
 
 void validate_mode(const Options& options) {
@@ -149,8 +166,9 @@ void validate_mode(const Options& options) {
         throw std::runtime_error("--check-sdk cannot be combined with processing options");
     }
 
-    if (options.sdk_root && !options.check_sdk && !options.dry_run && !has_processing_options(options)) {
-        throw std::runtime_error("--sdk-root requires --check-sdk, --dry-run, or processing options");
+    if ((options.sdk_root || options.api_root || options.runtime_root) && !options.check_sdk &&
+        !options.dry_run && !has_processing_options(options)) {
+        throw std::runtime_error("SDK root options require --check-sdk, --dry-run, or processing options");
     }
 }
 
@@ -161,8 +179,10 @@ void require_processing_triplet(const Options& options) {
 }
 
 void print_sdk_probe(const SdkProbeResult& probe) {
-    std::cout << "SDK root: " << (probe.root.empty() ? "<not set>" : probe.root) << "\n";
-    std::cout << "Path exists: " << (probe.exists ? "yes" : "no") << "\n";
+    std::cout << "API root: " << (probe.api_root.empty() ? "<not set>" : probe.api_root) << "\n";
+    std::cout << "Runtime root: " << (probe.runtime_root.empty() ? "<not set>" : probe.runtime_root) << "\n";
+    std::cout << "API root exists: " << (probe.api_root_exists ? "yes" : "no") << "\n";
+    std::cout << "Runtime root exists: " << (probe.runtime_root_exists ? "yes" : "no") << "\n";
     std::cout << "SDK-like structure: " << (probe.structurally_plausible ? "plausible" : "incomplete")
               << "\n";
 
@@ -181,16 +201,40 @@ void print_sdk_probe(const SdkProbeResult& probe) {
         }
         std::cout << "\n";
     }
+
+    if (!probe.libraries.empty()) {
+        std::cout << "Import libraries:\n";
+        for (const std::string& library : probe.libraries) {
+            std::cout << "  " << library << "\n";
+        }
+    }
+
+    if (!probe.runtime_dlls.empty()) {
+        std::cout << "Runtime DLLs:\n";
+        for (const std::string& dll : probe.runtime_dlls) {
+            std::cout << "  " << dll << "\n";
+        }
+    }
+
+    if (!probe.models.empty()) {
+        std::cout << "Models:\n";
+        for (const std::string& model : probe.models) {
+            std::cout << "  " << model << "\n";
+        }
+    }
 }
 
 int check_sdk(const Options& options) {
-    const std::string root = resolve_sdk_root(options.sdk_root.value_or(""));
-    if (root.empty()) {
-        std::cerr << "Error: SDK root is not set. Use --sdk-root or AFX_SDK_ROOT.\n";
+    const std::string api_root = resolve_api_root(options.api_root.value_or(""));
+    const std::string runtime_root =
+        resolve_runtime_root(options.runtime_root.value_or(""), options.sdk_root.value_or(""));
+    if (api_root.empty() && runtime_root.empty()) {
+        std::cerr << "Error: SDK roots are not set. Use --api-root/--runtime-root or NVAFX_API_ROOT/"
+                     "NVAFX_RUNTIME_ROOT.\n";
         return 2;
     }
 
-    const SdkProbeResult probe = probe_sdk_root(root);
+    const SdkProbeResult probe = probe_sdk_roots(api_root, runtime_root);
     print_sdk_probe(probe);
     return probe.structurally_plausible ? 0 : 2;
 }
@@ -206,9 +250,10 @@ int dry_run(const Options& options) {
         }
     }
 
-    const std::string sdk_root = resolve_sdk_root(options.sdk_root.value_or(""));
+    const std::string runtime_root =
+        resolve_runtime_root(options.runtime_root.value_or(""), options.sdk_root.value_or(""));
 
-    std::cout << "Dry run: SDK processing is not implemented and will not be called.\n";
+    std::cout << "Dry run: SDK processing will not be called and no output will be written.\n";
     std::cout << "Input: " << *options.input << "\n";
     std::cout << "Output: " << *options.output << "\n";
     std::cout << "Effect: " << *options.effect << "\n";
@@ -216,7 +261,8 @@ int dry_run(const Options& options) {
               << (options.sample_rate ? std::to_string(*options.sample_rate) : "<not set>") << "\n";
     std::cout << "Intensity: " << (options.intensity ? std::to_string(*options.intensity) : "<not set>")
               << "\n";
-    std::cout << "SDK root: " << (sdk_root.empty() ? "<not set>" : sdk_root) << "\n";
+    std::cout << "Model: " << (options.model ? *options.model : "<not set>") << "\n";
+    std::cout << "Runtime root: " << (runtime_root.empty() ? "<not set>" : runtime_root) << "\n";
 
     if (audio) {
         const std::size_t frames = audio->samples.empty() ? 0U : audio->samples.front().size();
@@ -230,10 +276,35 @@ int dry_run(const Options& options) {
 int process(const Options& options) {
     require_processing_triplet(options);
 
-    std::cerr
-        << "SDK processing is not implemented yet. NVIDIA Audio Effects SDK binaries and models "
-           "are not included in this repository.\n";
-    return 3;
+    if (!options.model) {
+        throw std::runtime_error("--model is required for SDK processing");
+    }
+
+    if (!std::filesystem::is_regular_file(*options.model)) {
+        throw std::runtime_error("model path does not exist: " + *options.model);
+    }
+
+    const AudioBuffer input = read_wav_file(*options.input);
+    if (options.sample_rate && static_cast<int>(input.sample_rate) != *options.sample_rate) {
+        throw std::runtime_error("--sample-rate does not match input WAV sample rate");
+    }
+
+    const std::string runtime_root =
+        resolve_runtime_root(options.runtime_root.value_or(""), options.sdk_root.value_or(""));
+    if (runtime_root.empty()) {
+        throw std::runtime_error("--runtime-root, --sdk-root, NVAFX_RUNTIME_ROOT, or AFX_SDK_ROOT is required for SDK processing");
+    }
+
+    const AfxProcessOptions process_options{
+        *options.effect,
+        *options.model,
+        runtime_root,
+        static_cast<float>(options.intensity.value_or(1.0)),
+    };
+    const AudioBuffer output = process_with_afx_sdk(input, process_options);
+    write_float_wav_file(*options.output, output);
+    std::cout << "Processed WAV written: " << *options.output << "\n";
+    return 0;
 }
 
 }  // namespace

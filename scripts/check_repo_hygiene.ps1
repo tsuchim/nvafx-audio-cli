@@ -4,7 +4,8 @@ $trackedFiles = git ls-files
 $blockedExtensions = @(
     ".wav", ".mp4", ".mov", ".mkv", ".avi", ".flac", ".aac", ".mp3",
     ".dll", ".exe", ".lib", ".pdb", ".ilk", ".obj", ".exp",
-    ".zip", ".7z", ".tar", ".gz", ".tgz"
+    ".zip", ".7z", ".tar", ".gz", ".tgz",
+    ".trtpkg", ".onnx", ".engine"
 )
 
 $blockedPathPatterns = @(

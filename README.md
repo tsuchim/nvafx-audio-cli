@@ -1,12 +1,12 @@
 # nvafx-audio-cli
 
-Small offline audio processing CLI for NVIDIA Audio Effects SDK.
+Small offline WAV processing CLI for NVIDIA Audio Effects SDK.
 
-This project is intended to become a small Windows-first command-line tool that processes WAV files offline through NVIDIA Audio Effects SDK. It currently contains only a source-only CLI scaffold and does not call the NVIDIA SDK yet.
+This project is a small Windows-first command-line tool that processes WAV files offline through a locally installed NVIDIA Audio Effects SDK.
 
-NVIDIA SDK binaries, models, AI features, redistributables, installers, generated audio/video files, and sample media are not included in this repository. Users must install NVIDIA Audio Effects SDK separately before future SDK-backed processing can work.
+NVIDIA SDK binaries, models, AI features, redistributables, installers, generated audio/video files, and sample media are not included in this repository. The official NVIDIA Maxine AFX SDK API repository is used only as a local build dependency and is not vendored here.
 
-Initial planned effects:
+Supported effects:
 
 - `denoiser`
 - `dereverb`
@@ -18,10 +18,10 @@ Initial intended workflow:
 2. `nvafx-audio-cli` processes the WAV file.
 3. `ffmpeg` remuxes and normalizes the processed audio.
 
-Future CLI shape:
+Processing requires an SDK-enabled build, a runtime root, and an explicit model path:
 
 ```powershell
-nvafx-audio-cli --input in.wav --output out.wav --effect denoiser --sample-rate 48000 --intensity 1.0
+nvafx-audio-cli --input in.wav --output out.wav --effect denoiser --sample-rate 48000 --intensity 1.0 --model C:\Path\To\denoiser_48k.trtpkg --runtime-root C:\Path\To\NVIDIA-Audio-Effects-SDK
 ```
 
 This project is not sponsored, endorsed, or approved by NVIDIA. NVIDIA, Maxine, RTX, and related names are trademarks of NVIDIA Corporation.
@@ -48,7 +48,7 @@ The current WAV foundation supports only the subset intended for early ffmpeg-ge
 - Internal planar `float` audio representation.
 - 32-bit float WAV writing infrastructure.
 
-No NVIDIA Audio Effects SDK processing is implemented yet.
+Mono input is supported with the installed SDK models tested locally. Stereo input is rejected clearly when the loaded SDK effect/model reports mono-only input and output channels.
 
 ## CLI Checks
 
@@ -58,23 +58,34 @@ Use `--dry-run` to validate arguments and supported input WAV metadata without c
 nvafx-audio-cli --input in.wav --output out.wav --effect denoiser --sample-rate 48000 --intensity 1.0 --dry-run
 ```
 
-Use `--check-sdk` to inspect a user-provided SDK root or `AFX_SDK_ROOT`:
+Use `--check-sdk` to inspect a user-provided API root and runtime root:
 
 ```powershell
-nvafx-audio-cli --check-sdk --sdk-root C:\Path\To\AFX
+nvafx-audio-cli --check-sdk --api-root C:\Path\To\Maxine-AFX-SDK\nvafx --runtime-root C:\Path\To\NVIDIA-Audio-Effects-SDK
 ```
 
 ## Build
 
+Default SDK-free build:
+
 ```powershell
 cmake -S . -B build
-cmake --build build
+cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 .\scripts\check_repo_hygiene.ps1
 ```
+
+SDK-enabled build:
+
+```powershell
+cmake -S . -B build-sdk -DNVAFX_ENABLE_SDK=ON -DNVAFX_API_ROOT=C:\Path\To\Maxine-AFX-SDK\nvafx -DNVAFX_RUNTIME_ROOT=C:\Path\To\NVIDIA-Audio-Effects-SDK
+cmake --build build-sdk --config Release
+```
+
+`NVAFX_API_ROOT` must point to the external API root containing `include\nvAudioEffects.h` and `lib\NVAudioEffects.lib`. `NVAFX_RUNTIME_ROOT` must point to the installed runtime root containing `NVAudioEffects.dll` and `models\*.trtpkg`. Environment variables with the same names are also accepted; `AFX_SDK_ROOT` remains a runtime-root compatibility fallback.
 
 The main release gate runs on pull requests targeting `main` only. It performs a clean Windows build, CTest guardrails, repository hygiene checks, and CLI public-contract checks without requiring NVIDIA Audio Effects SDK.
 
 ## Current Status
 
-The CLI, SDK discovery checks, and narrow WAV I/O foundation are implemented. SDK processing is intentionally not implemented yet and returns a non-zero exit code when requested. The intended next step is actual AFX binding after the hardened WAV foundation is integrated in `devel`.
+The CLI, SDK discovery checks, WAV I/O, and NVIDIA AFX SDK processing path are implemented. The default build remains SDK-free and fails clearly if processing is requested without SDK support.

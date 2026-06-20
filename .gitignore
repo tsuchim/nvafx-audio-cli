@@ -1,5 +1,6 @@
 # Build output
 build/
+build-*/
 out/
 bin/
 obj/
@@ -65,6 +66,9 @@ third_party/nvidia/
 *.7z
 *.tar
 *.tar.gz
+*.trtpkg
+*.onnx
+*.engine
 
 # Local environment and configuration
 .env
