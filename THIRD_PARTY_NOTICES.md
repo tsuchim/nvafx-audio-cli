@@ -15,3 +15,5 @@ This project is not sponsored, endorsed, or approved by NVIDIA. NVIDIA, Maxine, 
 ## Future Dependencies
 
 No third-party source dependencies are included at this time.
+
+The current C++ implementation remains dependency-free and does not include NVIDIA SDK source, binaries, models, or generated media.

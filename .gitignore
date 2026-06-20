@@ -51,7 +51,12 @@ Testing/
 # NVIDIA SDKs, models, features, and redistributables
 Audio_Effects_SDK*/
 NVIDIA_Audio_Effects_SDK*/
-nvafx*/
+NVIDIA-Audio-Effects-SDK*/
+nvidia-audio-effects-sdk*/
+nvidia_sdk*/
+nvidia-sdk*/
+external/nvidia*/
+vendor/nvidia*/
 models/
 features/
 sdk/
