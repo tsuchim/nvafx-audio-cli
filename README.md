@@ -12,11 +12,10 @@ Supported effects:
 - `dereverb`
 - `dereverb_denoiser`
 
-Initial intended workflow:
+Supported workflows:
 
-1. `ffmpeg` extracts audio to WAV.
-2. `nvafx-audio-cli` processes the WAV file.
-3. `ffmpeg` remuxes and normalizes the processed audio.
+- Temporary WAV files: `ffmpeg` extracts audio to WAV, `nvafx-audio-cli` processes the WAV file, and `ffmpeg` remuxes or normalizes the processed audio.
+- Stdin/stdout WAV pipes: `ffmpeg` writes WAV bytes to stdout, `nvafx-audio-cli --input - --output -` processes the stream, and `ffmpeg` reads the processed WAV bytes from stdin.
 
 Processing requires an SDK-enabled build, a runtime root, and an explicit model path:
 
