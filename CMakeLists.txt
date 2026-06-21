@@ -195,6 +195,14 @@ if(BUILD_TESTING)
         COMMAND "${CLI_EXE}" --input "${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav" --output "${TEST_DATA_DIR}/disabled_out.wav" --effect denoiser --model "${TEST_DATA_DIR}/dummy_model.trtpkg" --runtime-root "${TEST_DATA_DIR}")
     set_tests_properties(cli-sdk-disabled-processing-fails PROPERTIES FIXTURES_REQUIRED wav_files WILL_FAIL TRUE)
 
+    add_test(NAME cli-check-sdk-missing-roots
+        COMMAND "${CLI_EXE}" --check-sdk --api-root "${TEST_DATA_DIR}/missing_api_root" --runtime-root "${TEST_DATA_DIR}/missing_runtime_root")
+    set_tests_properties(cli-check-sdk-missing-roots PROPERTIES WILL_FAIL TRUE)
+
+    add_test(NAME cli-check-sdk-fake-tree
+        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
+            "New-Item -ItemType Directory -Force -Path '${TEST_DATA_DIR}/fake_api/include', '${TEST_DATA_DIR}/fake_api/lib', '${TEST_DATA_DIR}/fake_runtime/models' | Out-Null; Set-Content -LiteralPath '${TEST_DATA_DIR}/fake_api/include/nvAudioEffects.h' -Value ''; Set-Content -LiteralPath '${TEST_DATA_DIR}/fake_api/lib/NVAudioEffects.lib' -Value ''; Set-Content -LiteralPath '${TEST_DATA_DIR}/fake_runtime/NVAudioEffects.dll' -Value ''; Set-Content -LiteralPath '${TEST_DATA_DIR}/fake_runtime/models/denoiser_48k.trtpkg' -Value ''; Set-Content -LiteralPath '${TEST_DATA_DIR}/fake_runtime/models/dereverb_48k.trtpkg' -Value ''; Set-Content -LiteralPath '${TEST_DATA_DIR}/fake_runtime/models/dereverb_denoiser_48k.trtpkg' -Value ''; & '${CLI_EXE}' --check-sdk --api-root '${TEST_DATA_DIR}/fake_api' --runtime-root '${TEST_DATA_DIR}/fake_runtime'")
+
     add_test(NAME repo-hygiene
         COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_repo_hygiene.ps1")
     set_tests_properties(repo-hygiene PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")

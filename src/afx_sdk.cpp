@@ -59,6 +59,10 @@ void check_status(NvAFX_Status status, const std::string& call) {
     }
 }
 
+std::string parameter_name(NvAFX_ParameterSelector parameter) {
+    return parameter == nullptr ? std::string("<null>") : std::string(parameter);
+}
+
 NvAFX_EffectSelector effect_selector(const std::string& effect) {
     if (effect == "denoiser") {
         return NVAFX_EFFECT_DENOISER;
@@ -136,7 +140,8 @@ private:
 
 unsigned get_u32(NvAFX_Handle handle, NvAFX_ParameterSelector parameter) {
     unsigned value = 0;
-    check_status(NvAFX_GetU32(handle, parameter, &value), std::string("NvAFX_GetU32(") + parameter + ")");
+    check_status(NvAFX_GetU32(handle, parameter, &value),
+                 "NvAFX_GetU32(" + parameter_name(parameter) + ")");
     return value;
 }
 

@@ -1,5 +1,6 @@
 #include "sdk_discovery.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <memory>
@@ -25,15 +26,37 @@ std::string read_environment_variable(const char* name) {
 
 void collect_files_with_extension(const std::filesystem::path& root, const std::string& extension,
                                   std::vector<std::string>* output) {
-    if (!std::filesystem::is_directory(root)) {
+    std::error_code error;
+    if (!std::filesystem::is_directory(root, error) || error) {
         return;
     }
 
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
-        if (entry.is_regular_file() && entry.path().extension() == extension) {
-            output->push_back(entry.path().string());
+    std::vector<std::string> found;
+
+    try {
+        const auto options = std::filesystem::directory_options::skip_permission_denied;
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(root, options)) {
+            std::error_code entry_error;
+            if (entry.is_regular_file(entry_error) && !entry_error && entry.path().extension() == extension) {
+                found.push_back(entry.path().string());
+            }
         }
+    } catch (const std::filesystem::filesystem_error&) {
+        // SDK probing is structural and best-effort; unreadable subtrees are skipped.
     }
+
+    std::sort(found.begin(), found.end());
+    output->insert(output->end(), found.begin(), found.end());
+}
+
+bool safe_is_directory(const std::filesystem::path& path) {
+    std::error_code error;
+    return std::filesystem::is_directory(path, error) && !error;
+}
+
+bool safe_is_regular_file(const std::filesystem::path& path) {
+    std::error_code error;
+    return std::filesystem::is_regular_file(path, error) && !error;
 }
 
 }  // namespace
@@ -71,23 +94,38 @@ SdkProbeResult probe_sdk_roots(const std::string& api_root, const std::string& r
     const std::filesystem::path api_path(api_root);
     const std::filesystem::path runtime_path(runtime_root);
 
-    result.api_root_exists = !api_root.empty() && std::filesystem::is_directory(api_path);
-    result.runtime_root_exists = !runtime_root.empty() && std::filesystem::is_directory(runtime_path);
-    result.header_found = std::filesystem::is_regular_file(api_path / "include" / "nvAudioEffects.h");
-    result.import_library_found = std::filesystem::is_regular_file(api_path / "lib" / "NVAudioEffects.lib");
-    result.runtime_dll_found = std::filesystem::is_regular_file(runtime_path / "NVAudioEffects.dll");
-    result.models_path_found = std::filesystem::is_directory(runtime_path / "models");
-    result.denoiser_model_found = std::filesystem::is_regular_file(runtime_path / "models" / "denoiser_48k.trtpkg") ||
-                                  std::filesystem::is_regular_file(runtime_path / "models" / "denoiser_16k.trtpkg");
-    result.dereverb_model_found = std::filesystem::is_regular_file(runtime_path / "models" / "dereverb_48k.trtpkg") ||
-                                  std::filesystem::is_regular_file(runtime_path / "models" / "dereverb_16k.trtpkg");
-    result.dereverb_denoiser_model_found =
-        std::filesystem::is_regular_file(runtime_path / "models" / "dereverb_denoiser_48k.trtpkg") ||
-        std::filesystem::is_regular_file(runtime_path / "models" / "dereverb_denoiser_16k.trtpkg");
+    result.api_root_exists = !api_root.empty() && safe_is_directory(api_path);
+    result.runtime_root_exists = !runtime_root.empty() && safe_is_directory(runtime_path);
 
-    collect_files_with_extension(api_path / "lib", ".lib", &result.libraries);
-    collect_files_with_extension(runtime_path, ".dll", &result.runtime_dlls);
-    collect_files_with_extension(runtime_path / "models", ".trtpkg", &result.models);
+    result.header_found =
+        result.api_root_exists && safe_is_regular_file(api_path / "include" / "nvAudioEffects.h");
+    result.import_library_found =
+        result.api_root_exists && safe_is_regular_file(api_path / "lib" / "NVAudioEffects.lib");
+    result.runtime_dll_found =
+        result.runtime_root_exists && safe_is_regular_file(runtime_path / "NVAudioEffects.dll");
+    result.models_path_found = result.runtime_root_exists && safe_is_directory(runtime_path / "models");
+    result.denoiser_model_found =
+        result.models_path_found &&
+        (safe_is_regular_file(runtime_path / "models" / "denoiser_48k.trtpkg") ||
+         safe_is_regular_file(runtime_path / "models" / "denoiser_16k.trtpkg"));
+    result.dereverb_model_found =
+        result.models_path_found &&
+        (safe_is_regular_file(runtime_path / "models" / "dereverb_48k.trtpkg") ||
+         safe_is_regular_file(runtime_path / "models" / "dereverb_16k.trtpkg"));
+    result.dereverb_denoiser_model_found =
+        result.models_path_found &&
+        (safe_is_regular_file(runtime_path / "models" / "dereverb_denoiser_48k.trtpkg") ||
+         safe_is_regular_file(runtime_path / "models" / "dereverb_denoiser_16k.trtpkg"));
+
+    if (result.api_root_exists) {
+        collect_files_with_extension(api_path / "lib", ".lib", &result.libraries);
+    }
+    if (result.runtime_root_exists) {
+        collect_files_with_extension(runtime_path, ".dll", &result.runtime_dlls);
+    }
+    if (result.models_path_found) {
+        collect_files_with_extension(runtime_path / "models", ".trtpkg", &result.models);
+    }
 
     const std::vector<std::pair<std::string, bool>> checks = {
         {"api include/nvAudioEffects.h", result.header_found},
