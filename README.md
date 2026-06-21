@@ -31,7 +31,7 @@ This project is not sponsored, endorsed, or approved by NVIDIA. NVIDIA, Maxine, 
 - `devel` is the development integration branch.
 - Intermediate development is integrated into `devel` without development pull requests.
 - Release pull requests are only from `devel` to `main`.
-- GitHub Actions are reserved for `devel` to `main` release PR guardrails.
+- GitHub Actions are reserved for `devel` to `main` release PR guardrails and explicit release packaging. They are not routine development validation.
 - Routine development validation is local-only; CI protects `main` and does not replace local testing.
 - Copilot review and bot review must not be requested.
 
@@ -114,6 +114,11 @@ cmake --build build-sdk --config Release
 
 The main release gate runs on pull requests targeting `main` only. It performs a clean Windows build, CTest guardrails, repository hygiene checks, and CLI public-contract checks without requiring NVIDIA Audio Effects SDK.
 
+
+## Release Packaging
+
+`v0.1.0` was the initial manual binary/MSI release. `v0.1.1` is the first GitHub Actions-built and GitHub-attested release. See `docs/release-packaging.md` for provenance, SDK-free CI binary, MSI, and signing notes.
 ## Current Status
 
 The CLI, SDK discovery checks, WAV I/O, and NVIDIA AFX SDK processing path are implemented. The default build remains SDK-free and fails clearly if processing is requested without SDK support.
+

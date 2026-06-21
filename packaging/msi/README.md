@@ -21,10 +21,10 @@ Runtime processing still requires explicit paths:
 nvafx-audio-cli --input in.wav --output out.wav --effect denoiser --sample-rate 48000 --model <path-to-model.trtpkg> --runtime-root <path-to-NVIDIA-Audio-Effects-SDK-runtime>
 ```
 
-The v0.1.0 MSI is unsigned unless code signing is explicitly configured later.
+The MSI is unsigned unless code signing is explicitly configured later.
 Unsigned MSI packages may show Windows SmartScreen or publisher warnings.
 
-MSIX is intentionally not produced for v0.1.0 because production MSIX
+MSIX is intentionally not produced because production MSIX
 distribution requires trusted package signing, which this project does not have
 configured.
 
@@ -32,9 +32,9 @@ Build example:
 
 ```powershell
 .\packaging\msi\build-msi.ps1 `
-  -InputDirectory .\build-release-package\nvafx-audio-cli-v0.1.0-windows-x64 `
+  -InputDirectory .\build-release-package\nvafx-audio-cli-v0.1.1-windows-x64 `
   -OutputDirectory .\build-msi-package `
-  -Version 0.1.0 `
+  -Version 0.1.1 `
   -Architecture x64
 ```
 

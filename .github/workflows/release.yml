@@ -1,0 +1,245 @@
+name: Release Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without leading v, for example 0.1.1
+        required: true
+        default: 0.1.1
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out release ref
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Resolve release version
+        shell: pwsh
+        run: |
+          $version = '${{ github.event.inputs.version }}'
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            if ('${{ github.ref_type }}' -ne 'tag' -or -not '${{ github.ref_name }}'.StartsWith('v')) {
+              throw 'Release version is required unless running from a v* tag.'
+            }
+            $version = '${{ github.ref_name }}'.Substring(1)
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Version must be major.minor.patch: $version"
+          }
+          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+          "RELEASE_TAG=v$version" >> $env:GITHUB_ENV
+          "PACKAGE_NAME=nvafx-audio-cli-v$version-windows-x64" >> $env:GITHUB_ENV
+
+      - name: Configure SDK-free release build
+        run: cmake -S . -B build-release
+
+      - name: Build SDK-free release executable
+        run: cmake --build build-release --config Release
+
+      - name: Run SDK-free tests
+        run: ctest --test-dir build-release -C Release --output-on-failure
+
+      - name: Repository hygiene
+        run: .\scripts\check_repo_hygiene.ps1
+
+      - name: Install WiX Toolset
+        shell: pwsh
+        run: dotnet tool install wix --tool-path .wix --version 5.0.2
+
+      - name: Stage release payload
+        shell: pwsh
+        run: |
+          $packageDir = Join-Path 'build-release-package' $env:PACKAGE_NAME
+          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+          Copy-Item -LiteralPath 'build-release\Release\nvafx-audio-cli.exe' -Destination $packageDir
+          Copy-Item -LiteralPath 'README.md' -Destination $packageDir
+          Copy-Item -LiteralPath 'LICENSE' -Destination $packageDir
+          Copy-Item -LiteralPath 'THIRD_PARTY_NOTICES.md' -Destination $packageDir
+          @"
+          nvafx-audio-cli v$env:RELEASE_VERSION
+          Package: $env:PACKAGE_NAME
+
+          Release tag target:
+          $env:GITHUB_SHA
+
+          Built executable:
+          nvafx-audio-cli.exe
+
+          Build mode:
+          Windows x64 Release
+          SDK-enabled build: no
+          NVIDIA SDK runtime included: no
+          NVIDIA models included: no
+          NVIDIA DLLs included: no
+          NVIDIA import libraries included: no
+          NVIDIA headers included: no
+
+          Important:
+          This GitHub Actions-built binary is SDK-free. It supports CLI validation, WAV I/O guardrails, --dry-run, and --check-sdk, but actual NVIDIA AFX processing requires a local SDK-enabled build until a legal CI SDK setup exists.
+
+          Required external runtime for SDK-enabled local processing:
+          NVIDIA Audio Effects SDK installed locally by the user.
+
+          Required runtime arguments for SDK-enabled processing:
+          --runtime-root <path to NVIDIA Audio Effects SDK runtime>
+          --model <path to .trtpkg model>
+
+          Supported effects in SDK-enabled builds:
+          denoiser
+          dereverb
+          dereverb_denoiser
+
+          Supported sample rates:
+          16000
+          48000
+
+          Pipe support:
+          --input - reads WAV from stdin
+          --output - writes 32-bit float WAV to stdout
+          PowerShell 7.4+ or cmd.exe is recommended for binary WAV pipes.
+          Do not use 2>&1 with --output -.
+          "@ | Set-Content -Encoding utf8 -LiteralPath (Join-Path $packageDir 'BUILD_INFO.txt')
+
+      - name: Build MSI
+        shell: pwsh
+        run: |
+          .\packaging\msi\build-msi.ps1 `
+            -InputDirectory (Join-Path 'build-release-package' $env:PACKAGE_NAME) `
+            -OutputDirectory 'build-release-package' `
+            -Version $env:RELEASE_VERSION `
+            -Architecture x64 `
+            -WixPath '.\.wix\wix.exe'
+
+      - name: Create zip package and checksums
+        shell: pwsh
+        run: |
+          $packageDir = Join-Path 'build-release-package' $env:PACKAGE_NAME
+          $zipPath = Join-Path 'build-release-package' "$env:PACKAGE_NAME.zip"
+          $msiPath = Join-Path 'build-release-package' "$env:PACKAGE_NAME.msi"
+          Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
+          Compress-Archive -Path (Join-Path $packageDir '*') -DestinationPath $zipPath -CompressionLevel Optimal
+          $exeHash = (Get-FileHash -Algorithm SHA256 (Join-Path $packageDir 'nvafx-audio-cli.exe')).Hash.ToLowerInvariant()
+          $zipHash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLowerInvariant()
+          $msiHash = (Get-FileHash -Algorithm SHA256 $msiPath).Hash.ToLowerInvariant()
+          @(
+            "$zipHash  $env:PACKAGE_NAME.zip",
+            "$msiHash  $env:PACKAGE_NAME.msi",
+            "$exeHash  nvafx-audio-cli.exe"
+          ) | Set-Content -Encoding ascii -LiteralPath 'build-release-package\SHA256SUMS.txt'
+          Get-Content -LiteralPath 'build-release-package\SHA256SUMS.txt'
+
+      - name: Attest zip package
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: build-release-package/${{ env.PACKAGE_NAME }}.zip
+
+      - name: Attest MSI package
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: build-release-package/${{ env.PACKAGE_NAME }}.msi
+
+      - name: Attest executable
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: build-release-package/${{ env.PACKAGE_NAME }}/nvafx-audio-cli.exe
+
+      - name: Attest checksums
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: build-release-package/SHA256SUMS.txt
+
+      - name: Write release notes
+        shell: pwsh
+        run: |
+          @"
+          ## nvafx-audio-cli v$env:RELEASE_VERSION
+
+          Windows-first offline WAV processing CLI for NVIDIA Audio Effects SDK.
+
+          ### GitHub Actions-built assets
+
+          This is the first GitHub Actions-built and GitHub-attested release of nvafx-audio-cli.
+
+          Download:
+
+          - $env:PACKAGE_NAME.zip
+          - $env:PACKAGE_NAME.msi
+          - SHA256SUMS.txt
+
+          ### Provenance and verification
+
+          Release artifacts are built by GitHub Actions from the public repository source and receive GitHub Artifact Attestations.
+
+          This lets users verify that the distributed artifacts came from this repository, commit/tag, and workflow. It does not prove the code is harmless; it makes the source-to-artifact relationship inspectable.
+
+          Example verification:
+
+              gh attestation verify $env:PACKAGE_NAME.zip -R tsuchim/nvafx-audio-cli
+              gh attestation verify $env:PACKAGE_NAME.msi -R tsuchim/nvafx-audio-cli
+
+          ### Important SDK note
+
+          The GitHub-attested CI binary is SDK-free because GitHub-hosted runners do not include NVIDIA Audio Effects SDK and this workflow does not vendor, scrape, or download restricted NVIDIA SDK files.
+
+          The CI binary is useful for CLI validation, WAV I/O guardrails, --dry-run, --check-sdk, and documentation/package structure. Actual NVIDIA AFX processing still requires a local SDK-enabled build until a legal CI SDK setup exists.
+
+          This release does not include NVIDIA SDK files, NVIDIA DLLs, NVIDIA models, headers, import libraries, redistributables, installers, generated media, or sample media.
+
+          To process audio with a local SDK-enabled build, install NVIDIA Audio Effects SDK separately and pass:
+
+          - --runtime-root <path to NVIDIA Audio Effects SDK runtime>
+          - --model <path to .trtpkg model>
+
+          ### Supported effects in SDK-enabled builds
+
+          - denoiser
+          - dereverb
+          - dereverb_denoiser
+
+          ### Supported sample rates
+
+          - 16000
+          - 48000
+
+          ### FFmpeg pipe support
+
+          - --input - reads WAV from stdin.
+          - --output - writes 32-bit float WAV to stdout.
+          - stdout contains WAV bytes only when --output - is used.
+          - Use PowerShell 7.4+ or cmd.exe for binary WAV pipelines.
+          - Do not use 2>&1 with --output -.
+
+          ### Signing
+
+          GitHub Artifact Attestation is included. Authenticode signing is not yet included.
+
+          MSIX is not produced for v$env:RELEASE_VERSION because production MSIX distribution requires trusted package signing.
+          "@ | Set-Content -Encoding utf8 -LiteralPath 'build-release-package\RELEASE_NOTES.md'
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:RELEASE_TAG `
+            "build-release-package\$env:PACKAGE_NAME.zip" `
+            "build-release-package\$env:PACKAGE_NAME.msi" `
+            'build-release-package\SHA256SUMS.txt' `
+            --repo $env:GITHUB_REPOSITORY `
+            --title "nvafx-audio-cli v$env:RELEASE_VERSION" `
+            --notes-file 'build-release-package\RELEASE_NOTES.md' `
+            --target $env:GITHUB_SHA `
+            --verify-tag
