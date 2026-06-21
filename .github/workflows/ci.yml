@@ -1,22 +1,29 @@
-name: CI
+name: Main Release Gate
 
 on:
-  push:
   pull_request:
+    branches:
+      - main
 
 jobs:
-  build-windows:
+  main-release-gate:
     runs-on: windows-latest
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configure
         run: cmake -S . -B build
 
       - name: Build
         run: cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Repository hygiene
+        run: .\scripts\check_repo_hygiene.ps1
 
       - name: Verify help
         run: .\build\Release\nvafx-audio-cli.exe --help
