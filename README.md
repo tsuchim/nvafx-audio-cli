@@ -50,6 +50,35 @@ The current WAV foundation supports only the subset intended for early ffmpeg-ge
 
 Mono input is supported with the installed SDK models tested locally. Stereo input is rejected clearly when the loaded SDK effect/model reports mono-only input and output channels.
 
+
+## Pipe Usage
+
+`--input -` reads WAV bytes from stdin. `--output -` writes processed 32-bit float WAV bytes to stdout. File paths remain supported and are the safest workflow when shell byte-stream behavior is uncertain.
+
+When `--output -` is used for processing, stdout contains WAV bytes only. Diagnostics, warnings, and errors are written to stderr. Do not use `2>&1` with `--output -`, because that can corrupt the WAV stream.
+
+Windows pipe safety is conservative:
+
+- `cmd.exe` binary pipes are allowed.
+- PowerShell 7.4 or newer is required for native byte-stream piping.
+- Windows PowerShell 5.1 is rejected by default for binary WAV pipes.
+- PowerShell cmdlets must not be placed in the middle of a binary WAV pipeline.
+- Unknown parent shells are rejected by default.
+- `--allow-unsafe-pipe` overrides the refusal and prints a warning to stderr.
+
+FFmpeg pipe example from `cmd.exe` or PowerShell 7.4+:
+
+```powershell
+ffmpeg -i input.mp4 -vn -ac 1 -ar 48000 -f wav - | nvafx-audio-cli --input - --output - --effect denoiser --sample-rate 48000 --intensity 1.0 --model C:\Path\To\denoiser_48k.trtpkg --runtime-root C:\Path\To\NVIDIA-Audio-Effects-SDK | ffmpeg -f wav -i - -i input.mp4 -map 1:v? -map 0:a -c:v copy output.mp4
+```
+
+If unsure, keep using temporary WAV files:
+
+```powershell
+ffmpeg -i input.mp4 -vn -ac 1 -ar 48000 temp-in.wav
+nvafx-audio-cli --input temp-in.wav --output temp-out.wav --effect denoiser --sample-rate 48000 --intensity 1.0 --model C:\Path\To\denoiser_48k.trtpkg --runtime-root C:\Path\To\NVIDIA-Audio-Effects-SDK
+ffmpeg -i input.mp4 -i temp-out.wav -map 0:v? -map 1:a -c:v copy output.mp4
+```
 ## CLI Checks
 
 Use `--dry-run` to validate arguments and supported input WAV metadata without calling the SDK or writing output:

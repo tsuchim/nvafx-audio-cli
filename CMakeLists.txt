@@ -47,6 +47,7 @@ add_executable(nvafx-audio-cli
     src/cli.cpp
     src/main.cpp
     src/sdk_discovery.cpp
+    src/stdio_binary.cpp
     src/wav.cpp
 )
 
@@ -60,6 +61,10 @@ if(NVAFX_ENABLE_SDK)
         target_link_options(nvafx-audio-cli PRIVATE /DELAYLOAD:NVAudioEffects.dll)
         target_link_libraries(nvafx-audio-cli PRIVATE delayimp)
     endif()
+endif()
+
+if(WIN32)
+    target_link_libraries(nvafx-audio-cli PRIVATE Version)
 endif()
 
 if(MSVC)
@@ -82,10 +87,19 @@ if(BUILD_TESTING)
     target_compile_features(wav-inspect PRIVATE cxx_std_17)
     target_include_directories(wav-inspect PRIVATE src)
 
+    add_executable(wav-stdout tests/wav_stdout.cpp src/stdio_binary.cpp src/wav.cpp)
+    target_compile_features(wav-stdout PRIVATE cxx_std_17)
+    target_include_directories(wav-stdout PRIVATE src)
+    if(WIN32)
+        target_link_libraries(wav-stdout PRIVATE Version)
+    endif()
+
     set(TEST_DATA_DIR "${CMAKE_CURRENT_BINARY_DIR}/testdata")
     set(CLI_EXE "$<TARGET_FILE:nvafx-audio-cli>")
     set(FIXTURE_EXE "$<TARGET_FILE:wav-fixture>")
     set(ROUNDTRIP_EXE "$<TARGET_FILE:wav-roundtrip>")
+    set(INSPECT_EXE "$<TARGET_FILE:wav-inspect>")
+    set(WAV_STDOUT_EXE "$<TARGET_FILE:wav-stdout>")
 
     add_test(NAME fixture-valid-pcm16-48k-mono
         COMMAND "${FIXTURE_EXE}" "${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav" 48000 1 pcm16)
@@ -194,6 +208,35 @@ if(BUILD_TESTING)
     add_test(NAME cli-sdk-disabled-processing-fails
         COMMAND "${CLI_EXE}" --input "${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav" --output "${TEST_DATA_DIR}/disabled_out.wav" --effect denoiser --model "${TEST_DATA_DIR}/dummy_model.trtpkg" --runtime-root "${TEST_DATA_DIR}")
     set_tests_properties(cli-sdk-disabled-processing-fails PROPERTIES FIXTURES_REQUIRED wav_files WILL_FAIL TRUE)
+
+    add_test(NAME cli-help-documents-allow-unsafe-pipe
+        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
+            "& '${CLI_EXE}' --help | Select-String -SimpleMatch '--allow-unsafe-pipe' | Out-Null")
+
+    add_test(NAME cli-stdin-dry-run-valid
+        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
+            "$p = Start-Process -FilePath '${CLI_EXE}' -ArgumentList @('--input','-','--output','${TEST_DATA_DIR}/stdin_dry.wav','--effect','denoiser','--dry-run','--allow-unsafe-pipe') -RedirectStandardInput '${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav' -RedirectStandardOutput '${TEST_DATA_DIR}/stdin_dry_stdout.txt' -RedirectStandardError '${TEST_DATA_DIR}/stdin_dry_stderr.txt' -NoNewWindow -Wait -PassThru; exit $p.ExitCode")
+    set_tests_properties(cli-stdin-dry-run-valid PROPERTIES FIXTURES_REQUIRED wav_files)
+
+    add_test(NAME cli-dry-run-output-stdout-empty
+        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
+            "Remove-Item -LiteralPath '${TEST_DATA_DIR}/dry_pipe_stdout.bin','${TEST_DATA_DIR}/dry_pipe_stderr.txt' -ErrorAction SilentlyContinue; $p = Start-Process -FilePath '${CLI_EXE}' -ArgumentList @('--input','${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav','--output','-','--effect','denoiser','--dry-run','--allow-unsafe-pipe') -RedirectStandardOutput '${TEST_DATA_DIR}/dry_pipe_stdout.bin' -RedirectStandardError '${TEST_DATA_DIR}/dry_pipe_stderr.txt' -NoNewWindow -Wait -PassThru; if ($p.ExitCode -ne 0) { exit $p.ExitCode }; if ((Get-Item -LiteralPath '${TEST_DATA_DIR}/dry_pipe_stdout.bin').Length -ne 0) { exit 1 }")
+    set_tests_properties(cli-dry-run-output-stdout-empty PROPERTIES FIXTURES_REQUIRED wav_files)
+
+    add_test(NAME cli-invalid-stdin-helpful-error
+        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
+            "Set-Content -LiteralPath '${TEST_DATA_DIR}/invalid_stdin.txt' -Value 'not a wav'; $p = Start-Process -FilePath '${CLI_EXE}' -ArgumentList @('--input','-','--output','${TEST_DATA_DIR}/invalid_stdin_out.wav','--effect','denoiser','--dry-run','--allow-unsafe-pipe') -RedirectStandardInput '${TEST_DATA_DIR}/invalid_stdin.txt' -RedirectStandardOutput '${TEST_DATA_DIR}/invalid_stdin_stdout.txt' -RedirectStandardError '${TEST_DATA_DIR}/invalid_stdin_stderr.txt' -NoNewWindow -Wait -PassThru; if ($p.ExitCode -eq 0) { exit 1 }; Select-String -LiteralPath '${TEST_DATA_DIR}/invalid_stdin_stderr.txt' -SimpleMatch 'valid RIFF/WAVE stream' | Out-Null")
+    set_tests_properties(cli-invalid-stdin-helpful-error PROPERTIES FIXTURES_REQUIRED wav_files)
+
+    add_test(NAME cli-sdk-disabled-output-stdout-clean
+        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
+            "Remove-Item -LiteralPath '${TEST_DATA_DIR}/disabled_pipe_stdout.bin','${TEST_DATA_DIR}/disabled_pipe_stderr.txt' -ErrorAction SilentlyContinue; $p = Start-Process -FilePath '${CLI_EXE}' -ArgumentList @('--input','${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav','--output','-','--effect','denoiser','--model','${TEST_DATA_DIR}/dummy_model.trtpkg','--runtime-root','${TEST_DATA_DIR}','--allow-unsafe-pipe') -RedirectStandardOutput '${TEST_DATA_DIR}/disabled_pipe_stdout.bin' -RedirectStandardError '${TEST_DATA_DIR}/disabled_pipe_stderr.txt' -NoNewWindow -Wait -PassThru; if ($p.ExitCode -eq 0) { exit 1 }; if ((Get-Item -LiteralPath '${TEST_DATA_DIR}/disabled_pipe_stdout.bin').Length -ne 0) { exit 1 }; Select-String -LiteralPath '${TEST_DATA_DIR}/disabled_pipe_stderr.txt' -SimpleMatch 'SDK support is not enabled' | Out-Null")
+    set_tests_properties(cli-sdk-disabled-output-stdout-clean PROPERTIES FIXTURES_REQUIRED wav_files)
+
+    add_test(NAME wav-stream-stdout-roundtrip
+        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
+            "$p = Start-Process -FilePath '${WAV_STDOUT_EXE}' -ArgumentList @('${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav') -RedirectStandardOutput '${TEST_DATA_DIR}/stream_stdout.wav' -RedirectStandardError '${TEST_DATA_DIR}/stream_stdout_stderr.txt' -NoNewWindow -Wait -PassThru; if ($p.ExitCode -ne 0) { exit $p.ExitCode }; & '${INSPECT_EXE}' '${TEST_DATA_DIR}/stream_stdout.wav' 48000 1 4")
+    set_tests_properties(wav-stream-stdout-roundtrip PROPERTIES FIXTURES_REQUIRED wav_files)
 
     add_test(NAME cli-check-sdk-missing-roots
         COMMAND "${CLI_EXE}" --check-sdk --api-root "${TEST_DATA_DIR}/missing_api_root" --runtime-root "${TEST_DATA_DIR}/missing_runtime_root")

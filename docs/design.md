@@ -54,6 +54,16 @@ If CMake cache variables are absent, `NVAFX_API_ROOT` and `NVAFX_RUNTIME_ROOT` e
 
 A structurally plausible setup has `include\nvAudioEffects.h`, `lib\NVAudioEffects.lib`, `NVAudioEffects.dll`, and a `models` directory.
 
+
+## Pipe I/O
+
+The CLI supports `--input -` for stdin and `--output -` for stdout. Stream I/O uses the same WAV parser and writer as file I/O, preserving the RIFF/WAVE, PCM16, float32, WAVE_FORMAT_EXTENSIBLE, channel, sample-rate, malformed, and truncated-file validations.
+
+On Windows, stdin and stdout are switched to binary mode only when pipe I/O is used. Processing with `--output -` never writes status text to stdout; stdout is reserved for WAV bytes only. Diagnostics remain on stderr.
+
+Windows shell safety is conservative. `cmd.exe` is allowed. `powershell.exe` is rejected because Windows PowerShell 5.1 is not safe for native binary WAV pipelines. `pwsh.exe` is allowed only when version detection confirms PowerShell 7.4 or newer. Unknown parent shells are rejected unless `--allow-unsafe-pipe` is used, in which case a warning is printed to stderr.
+
+Users should avoid `2>&1` with `--output -` and avoid inserting PowerShell cmdlets inside binary WAV pipelines. Temporary WAV files remain the recommended workflow when shell byte-stream behavior is uncertain.
 ## Dry Run
 
 `--dry-run` validates CLI arguments, validates supported input WAV metadata when `--input` is provided, resolves SDK root when available, prints the planned operation, does not call the SDK, does not write output, and exits successfully when validation succeeds.
