@@ -23,7 +23,7 @@
 - Intermediate development is integrated into `devel` without development pull requests.
 - Release pull requests are only from `devel` to `main`.
 - Nothing is merged into `main` unless explicitly treated as a release step.
-- GitHub Actions are reserved for `devel` to `main` release PR guardrails.
+- GitHub Actions are reserved for `devel` to `main` release PR guardrails and explicit release packaging.
 - Routine development validation is local-only.
 - CI exists to protect `main`, not to replace local development testing.
 - Copilot review and bot review must not be requested.
@@ -99,8 +99,15 @@ The release gate is intentionally minimal but checks guardrails:
 
 Development branches should run the same checks locally instead of using GitHub Actions as routine confirmation.
 
+
+## Release Packaging Workflow
+
+`.github/workflows/release.yml` creates GitHub Actions-built release assets for explicit release tags or manual release dispatch. The workflow builds the public SDK-free executable, creates the zip and MSI packages, writes `SHA256SUMS.txt`, publishes the GitHub Release, and emits GitHub Artifact Attestations.
+
+The workflow intentionally does not require or include NVIDIA SDK files. Until a legal CI SDK setup exists, attested CI binaries are SDK-free and actual AFX processing remains a local SDK-enabled build path.
 ## Processing
 
 The SDK adapter is isolated in `src/afx_sdk.cpp` and `src/afx_sdk.hpp`. All direct NVIDIA includes and SDK calls stay there. Processing reads WAV into planar float buffers, loads the requested SDK effect with an explicit `--model`, queries SDK frame size, sample rate, and channel constraints, processes padded frames, trims the final output to the original frame count, and writes 32-bit float WAV.
 
 Mono processing is supported for the tested installed models. Stereo is accepted by the WAV reader but rejected for SDK processing when the loaded effect/model reports mono-only input and output channels. The CLI does not process stereo channels independently because the SDK effect contract does not document that as equivalent.
+
