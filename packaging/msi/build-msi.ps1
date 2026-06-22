@@ -11,6 +11,9 @@ param(
     [ValidateSet('x64')]
     [string] $Architecture = 'x64',
 
+    [Parameter(Mandatory = $true)]
+    [string] $CustomActionDll,
+
     [string] $WixPath = 'wix'
 )
 
@@ -99,6 +102,10 @@ if ($Version -notmatch '^\d+\.\d+\.\d+$') {
 }
 
 $payloadDir = Resolve-ExistingDirectory $InputDirectory 'InputDirectory'
+if (-not (Test-Path -LiteralPath $CustomActionDll -PathType Leaf)) {
+    throw "CustomActionDll does not exist or is not a file: $CustomActionDll"
+}
+$customActionDllFull = (Resolve-Path -LiteralPath $CustomActionDll).Path
 $outputDirFull = [System.IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force -Path $outputDirFull | Out-Null
 
@@ -118,6 +125,7 @@ $wixArgs = @(
     '-arch', $Architecture,
     '-d', "ProductVersion=$Version",
     '-d', "PayloadDir=$payloadDir",
+    '-d', "CustomActionDll=$customActionDllFull",
     '-out', $msiPath
 )
 

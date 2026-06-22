@@ -117,7 +117,7 @@ The main release gate runs on pull requests targeting `main` only. It performs a
 
 ## Release Packaging
 
-`v0.1.0` was the initial manual binary/MSI release. `v0.1.1` is the first GitHub Actions-built and GitHub-attested release. `v0.1.2` adds MSI machine `PATH` registration for `C:\Program Files\nvafx-audio-cli`; reopen existing terminals after installing. The MSI does not add NVIDIA SDK/runtime/model paths to `PATH`. See `docs/release-packaging.md` for provenance, SDK-free CI binary, MSI, and signing notes.
+`v0.1.0` was the initial manual binary/MSI release. `v0.1.1` is the first GitHub Actions-built and GitHub-attested release. `v0.1.2` added MSI machine `PATH` registration. `v0.1.3` fixes PATH registration correctness so the MSI uses the actual install directory and repair/reinstall do not create duplicates; reopen existing terminals after installing. The MSI does not add NVIDIA SDK/runtime/model paths to `PATH`. See `docs/release-packaging.md` for provenance, SDK-free CI binary, MSI, and signing notes.
 ## Current Status
 
 The CLI, SDK discovery checks, WAV I/O, and NVIDIA AFX SDK processing path are implemented. The default build remains SDK-free and fails clearly if processing is requested without SDK support.
