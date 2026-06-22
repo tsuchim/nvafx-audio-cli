@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(nvafx_audio_cli VERSION 0.1.2 LANGUAGES CXX)
+project(nvafx_audio_cli VERSION 0.1.3 LANGUAGES CXX)
 
 option(NVAFX_ENABLE_SDK "Enable NVIDIA Audio Effects SDK integration" OFF)
 set(NVAFX_API_ROOT "" CACHE PATH "Path to the external Maxine AFX SDK API root containing include/ and lib/")
@@ -52,6 +52,16 @@ add_executable(nvafx-audio-cli
 )
 
 target_compile_features(nvafx-audio-cli PRIVATE cxx_std_17)
+if(WIN32)
+    add_library(nvafx-msi-custom-actions SHARED
+        packaging/msi/path_custom_action.cpp
+    )
+    target_compile_features(nvafx-msi-custom-actions PRIVATE cxx_std_17)
+    target_link_libraries(nvafx-msi-custom-actions PRIVATE Msi Advapi32 User32)
+    if(MSVC)
+        target_compile_options(nvafx-msi-custom-actions PRIVATE /W4 /permissive-)
+    endif()
+endif()
 
 if(NVAFX_ENABLE_SDK)
     target_compile_definitions(nvafx-audio-cli PRIVATE NVAFX_WITH_SDK)

@@ -9,6 +9,12 @@
     <MajorUpgrade DowngradeErrorMessage="A newer version of nvafx-audio-cli is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
+    <Binary Id="PathCustomActionsDll" SourceFile="$(var.CustomActionDll)" />
+    <CustomAction Id="SetAddPathCustomActionData" Property="AddInstallFolderToPath" Value="INSTALLFOLDER=[INSTALLFOLDER]" />
+    <CustomAction Id="AddInstallFolderToPath" BinaryRef="PathCustomActionsDll" DllEntry="AddInstallFolderToPath" Execute="deferred" Return="check" Impersonate="no" />
+    <CustomAction Id="SetRemovePathCustomActionData" Property="RemoveInstallFolderFromPath" Value="INSTALLFOLDER=[INSTALLFOLDER]" />
+    <CustomAction Id="RemoveInstallFolderFromPath" BinaryRef="PathCustomActionsDll" DllEntry="RemoveInstallFolderFromPath" Execute="deferred" Return="check" Impersonate="no" />
+
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="nvafx-audio-cli">
         <Component Id="cmpNvafxAudioCliExe" Guid="{A73E4B02-7485-49C5-8DB2-FA91AC0D1130}" Bitness="always64">
@@ -26,10 +32,6 @@
         <Component Id="cmpBuildInfo" Guid="{55D31382-A730-4BE0-903E-020DBE97A127}" Bitness="always64">
           <File Id="fileBuildInfo" Source="$(var.PayloadDir)\BUILD_INFO.txt" KeyPath="yes" />
         </Component>
-        <Component Id="cmpMachinePath" Guid="{C51705CC-E528-40F9-8BEF-0C3478B4DE36}" Bitness="always64">
-          <RegistryValue Root="HKLM" Key="Software\Eikai Information Systems\nvafx-audio-cli" Name="MachinePathComponent" Type="integer" Value="1" KeyPath="yes" />
-          <Environment Id="envMachinePath" Name="PATH" Value="[ProgramFiles64Folder]nvafx-audio-cli" Action="set" Part="last" System="yes" Permanent="no" />
-        </Component>
       </Directory>
     </StandardDirectory>
 
@@ -39,7 +41,13 @@
       <ComponentRef Id="cmpLicense" />
       <ComponentRef Id="cmpThirdPartyNotices" />
       <ComponentRef Id="cmpBuildInfo" />
-      <ComponentRef Id="cmpMachinePath" />
     </Feature>
+
+    <InstallExecuteSequence>
+      <Custom Action="SetRemovePathCustomActionData" Before="RemoveInstallFolderFromPath" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="RemoveInstallFolderFromPath" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="SetAddPathCustomActionData" Before="AddInstallFolderToPath" Condition="NOT REMOVE=&quot;ALL&quot;" />
+      <Custom Action="AddInstallFolderToPath" After="InstallFiles" Condition="NOT REMOVE=&quot;ALL&quot;" />
+    </InstallExecuteSequence>
   </Package>
 </Wix>

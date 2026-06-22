@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version without leading v, for example 0.1.2
+        description: Release version without leading v, for example 0.1.3
         required: true
-        default: 0.1.2
+        default: 0.1.3
   push:
     tags:
       - 'v*'
@@ -117,8 +117,9 @@ jobs:
           Do not use 2>&1 with --output -.
 
           MSI install behavior:
-          The MSI adds C:\Program Files\nvafx-audio-cli to the machine PATH.
+          The MSI adds its actual install directory to the machine PATH.
           Existing terminals may need to be reopened.
+          Repair and reinstall keep exactly one PATH entry.
           Uninstall removes the PATH entry.
           NVIDIA SDK runtime and model paths are not added to PATH.
           "@ | Set-Content -Encoding utf8 -LiteralPath (Join-Path $packageDir 'BUILD_INFO.txt')
@@ -131,6 +132,7 @@ jobs:
             -OutputDirectory 'build-release-package' `
             -Version $env:RELEASE_VERSION `
             -Architecture x64 `
+            -CustomActionDll 'build-release\Release\nvafx-msi-custom-actions.dll' `
             -WixPath '.\.wix\wix.exe'
 
       - name: Create zip package and checksums
@@ -236,7 +238,7 @@ jobs:
 
           The MSI installs nvafx-audio-cli.exe and project documentation to C:\Program Files\nvafx-audio-cli.
 
-          The MSI adds C:\Program Files\nvafx-audio-cli to the machine PATH. Existing terminals may need to be reopened before nvafx-audio-cli is found by command name. Uninstall removes the PATH entry.
+          The MSI adds its actual install directory to the machine PATH. Existing terminals may need to be reopened before nvafx-audio-cli is found by command name. Repair and reinstall keep exactly one PATH entry. Uninstall removes the PATH entry.
 
           The MSI does not include or configure NVIDIA SDK runtime files, DLLs, models, headers, import libraries, redistributables, installers, generated media, or sample media. NVIDIA SDK runtime and model paths are not added to PATH; processing still requires --runtime-root and --model.
 

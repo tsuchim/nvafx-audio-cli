@@ -11,9 +11,10 @@ The MSI installs only project files:
 - `THIRD_PARTY_NOTICES.md`
 - `BUILD_INFO.txt`
 
-The MSI adds `C:\Program Files\nvafx-audio-cli` to the machine `PATH` during
+The MSI adds its actual install directory to the machine `PATH` during
 install. Existing terminals may need to be reopened before they see the updated
-environment. Uninstall removes the same `PATH` entry.
+environment. Repair and reinstall keep exactly one `PATH` entry, and uninstall
+removes that entry.
 
 NVIDIA Audio Effects SDK runtime files, DLLs, models, headers, import
 libraries, installers, redistributables, generated media, and sample media are
@@ -37,10 +38,11 @@ Build example:
 
 ```powershell
 .\packaging\msi\build-msi.ps1 `
-  -InputDirectory .\build-release-package\nvafx-audio-cli-v0.1.2-windows-x64 `
+  -InputDirectory .\build-release-package\nvafx-audio-cli-v0.1.3-windows-x64 `
   -OutputDirectory .\build-msi-package `
-  -Version 0.1.2 `
-  -Architecture x64
+  -Version 0.1.3 `
+  -Architecture x64 `
+  -CustomActionDll .\build\Release\nvafx-msi-custom-actions.dll
 ```
 
 The script validates the staging directory before invoking WiX and fails if
