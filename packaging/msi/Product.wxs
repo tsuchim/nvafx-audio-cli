@@ -26,6 +26,10 @@
         <Component Id="cmpBuildInfo" Guid="{55D31382-A730-4BE0-903E-020DBE97A127}" Bitness="always64">
           <File Id="fileBuildInfo" Source="$(var.PayloadDir)\BUILD_INFO.txt" KeyPath="yes" />
         </Component>
+        <Component Id="cmpMachinePath" Guid="{C51705CC-E528-40F9-8BEF-0C3478B4DE36}" Bitness="always64">
+          <RegistryValue Root="HKLM" Key="Software\Eikai Information Systems\nvafx-audio-cli" Name="MachinePathComponent" Type="integer" Value="1" KeyPath="yes" />
+          <Environment Id="envMachinePath" Name="PATH" Value="[ProgramFiles64Folder]nvafx-audio-cli" Action="set" Part="last" System="yes" Permanent="no" />
+        </Component>
       </Directory>
     </StandardDirectory>
 
@@ -35,6 +39,7 @@
       <ComponentRef Id="cmpLicense" />
       <ComponentRef Id="cmpThirdPartyNotices" />
       <ComponentRef Id="cmpBuildInfo" />
+      <ComponentRef Id="cmpMachinePath" />
     </Feature>
   </Package>
 </Wix>

@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version without leading v, for example 0.1.1
+        description: Release version without leading v, for example 0.1.2
         required: true
-        default: 0.1.1
+        default: 0.1.2
   push:
     tags:
       - 'v*'
@@ -115,6 +115,12 @@ jobs:
           --output - writes 32-bit float WAV to stdout
           PowerShell 7.4+ or cmd.exe is recommended for binary WAV pipes.
           Do not use 2>&1 with --output -.
+
+          MSI install behavior:
+          The MSI adds C:\Program Files\nvafx-audio-cli to the machine PATH.
+          Existing terminals may need to be reopened.
+          Uninstall removes the PATH entry.
+          NVIDIA SDK runtime and model paths are not added to PATH.
           "@ | Set-Content -Encoding utf8 -LiteralPath (Join-Path $packageDir 'BUILD_INFO.txt')
 
       - name: Build MSI
@@ -175,7 +181,7 @@ jobs:
 
           ### GitHub Actions-built assets
 
-          This is the first GitHub Actions-built and GitHub-attested release of nvafx-audio-cli.
+          This is a GitHub Actions-built and GitHub-attested release of nvafx-audio-cli.
 
           Download:
 
@@ -225,6 +231,14 @@ jobs:
           - stdout contains WAV bytes only when --output - is used.
           - Use PowerShell 7.4+ or cmd.exe for binary WAV pipelines.
           - Do not use 2>&1 with --output -.
+
+          ### MSI installer
+
+          The MSI installs nvafx-audio-cli.exe and project documentation to C:\Program Files\nvafx-audio-cli.
+
+          The MSI adds C:\Program Files\nvafx-audio-cli to the machine PATH. Existing terminals may need to be reopened before nvafx-audio-cli is found by command name. Uninstall removes the PATH entry.
+
+          The MSI does not include or configure NVIDIA SDK runtime files, DLLs, models, headers, import libraries, redistributables, installers, generated media, or sample media. NVIDIA SDK runtime and model paths are not added to PATH; processing still requires --runtime-root and --model.
 
           ### Signing
 
