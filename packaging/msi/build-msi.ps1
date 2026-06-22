@@ -39,10 +39,16 @@ function Assert-RequiredFiles([string] $PayloadDir) {
         }
     }
 
-    $actual = Get-ChildItem -LiteralPath $PayloadDir -File | Select-Object -ExpandProperty Name
-    $extra = $actual | Where-Object { $_ -notin $required }
-    if ($extra) {
-        throw "Unexpected payload file(s): $($extra -join ', ')"
+    $actualItems = Get-ChildItem -LiteralPath $PayloadDir -Force
+    $directories = $actualItems | Where-Object { $_.PSIsContainer } | Select-Object -ExpandProperty Name
+    if ($directories) {
+        throw "Unexpected payload directories: $($directories -join ', ')"
+    }
+
+    $actual = $actualItems | Where-Object { -not $_.PSIsContainer } | Select-Object -ExpandProperty Name
+    $extraFiles = $actual | Where-Object { $_ -notin $required }
+    if ($extraFiles) {
+        throw "Unexpected payload file(s): $($extraFiles -join ', ')"
     }
 }
 

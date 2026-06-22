@@ -30,14 +30,18 @@ jobs:
         shell: pwsh
         run: |
           $version = '${{ github.event.inputs.version }}'
+          if ('${{ github.ref_type }}' -ne 'tag' -or -not '${{ github.ref_name }}'.StartsWith('v')) {
+            throw 'Release workflow must run from a v* tag ref.'
+          }
+          $tagVersion = '${{ github.ref_name }}'.Substring(1)
           if ([string]::IsNullOrWhiteSpace($version)) {
-            if ('${{ github.ref_type }}' -ne 'tag' -or -not '${{ github.ref_name }}'.StartsWith('v')) {
-              throw 'Release version is required unless running from a v* tag.'
-            }
-            $version = '${{ github.ref_name }}'.Substring(1)
+            $version = $tagVersion
           }
           if ($version -notmatch '^\d+\.\d+\.\d+$') {
             throw "Version must be major.minor.patch: $version"
+          }
+          if ($version -ne $tagVersion) {
+            throw "Version input '$version' does not match tag version '$tagVersion'."
           }
           "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
           "RELEASE_TAG=v$version" >> $env:GITHUB_ENV
