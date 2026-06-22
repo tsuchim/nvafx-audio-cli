@@ -18,11 +18,11 @@
 namespace nvafx {
 namespace {
 
+#ifdef _WIN32
+
 std::runtime_error stdio_error(const std::string& message) {
     return std::runtime_error(message);
 }
-
-#ifdef _WIN32
 
 std::string narrow_ascii(const wchar_t* value) {
     std::string output;

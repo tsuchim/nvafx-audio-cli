@@ -16,7 +16,7 @@
 namespace nvafx {
 namespace {
 
-constexpr const char* kVersion = "0.1.3";
+constexpr const char* kVersion = "0.2.0";
 
 struct Options {
     bool help = false;
