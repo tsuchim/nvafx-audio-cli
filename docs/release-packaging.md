@@ -6,6 +6,8 @@
 
 `v0.1.1` is the first GitHub Actions-built and GitHub-attested release. Its release assets are produced by the repository release workflow from public source.
 
+`v0.1.2` adds MSI machine `PATH` registration for `C:\Program Files\nvafx-audio-cli` so fresh terminals can run `nvafx-audio-cli` without a full path after installation.
+
 ## Provenance
 
 Release artifacts are built by GitHub Actions from the public repository source and receive GitHub Artifact Attestations.
@@ -15,8 +17,8 @@ This lets users verify that the distributed artifacts came from this repository,
 Example verification:
 
 ```powershell
-gh attestation verify nvafx-audio-cli-v0.1.1-windows-x64.zip -R tsuchim/nvafx-audio-cli
-gh attestation verify nvafx-audio-cli-v0.1.1-windows-x64.msi -R tsuchim/nvafx-audio-cli
+gh attestation verify nvafx-audio-cli-v0.1.2-windows-x64.zip -R tsuchim/nvafx-audio-cli
+gh attestation verify nvafx-audio-cli-v0.1.2-windows-x64.msi -R tsuchim/nvafx-audio-cli
 ```
 
 ## SDK policy
@@ -35,8 +37,10 @@ nvafx-audio-cli --input in.wav --output out.wav --effect denoiser --sample-rate 
 
 The MSI installs only `nvafx-audio-cli` project files. NVIDIA runtime files and models are not included and are not detected during installation.
 
+Starting with `v0.1.2`, the MSI adds `C:\Program Files\nvafx-audio-cli` to the machine `PATH`. Existing terminals may need to be reopened before the command is visible. Uninstall removes the same `PATH` entry. NVIDIA SDK runtime/model paths are not added to `PATH`; processing still requires explicit `--runtime-root` and `--model` arguments.
+
 MSI packages remain unsigned unless Authenticode signing is added later. Unsigned MSI packages may show Windows publisher or SmartScreen warnings.
 
 GitHub Artifact Attestation is separate from Authenticode signing. Attestation proves repository/workflow provenance for a release artifact; it does not make Windows treat the executable or MSI as a signed publisher binary.
 
-MSIX is deferred until trusted package signing is available. No MSIX package is produced for `v0.1.1`.
+MSIX is deferred until trusted package signing is available. No MSIX package is produced for `v0.1.2`.
