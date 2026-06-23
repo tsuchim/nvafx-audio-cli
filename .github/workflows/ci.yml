@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  main-release-gate:
+  windows-sdk-free:
     runs-on: windows-latest
 
     steps:
@@ -23,7 +23,38 @@ jobs:
         run: ctest --test-dir build -C Release --output-on-failure
 
       - name: Repository hygiene
-        run: .\scripts\check_repo_hygiene.ps1
+        run: python scripts/check_repo_hygiene.py
 
       - name: Verify help
         run: .\build\Release\nvafx-audio-cli.exe --help
+
+      - name: Verify version
+        run: .\build\Release\nvafx-audio-cli.exe --version
+
+  ubuntu-sdk-free:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build ffmpeg
+
+      - name: Configure
+        run: cmake -S . -B build-linux -G Ninja
+
+      - name: Build
+        run: cmake --build build-linux
+
+      - name: Test
+        run: ctest --test-dir build-linux --output-on-failure
+
+      - name: Repository hygiene
+        run: python3 scripts/check_repo_hygiene.py
+
+      - name: Verify help
+        run: ./build-linux/nvafx-audio-cli --help
+
+      - name: Verify version
+        run: ./build-linux/nvafx-audio-cli --version

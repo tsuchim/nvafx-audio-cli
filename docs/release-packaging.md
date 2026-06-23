@@ -8,6 +8,8 @@
 
 `v0.1.2` added MSI machine `PATH` registration. `v0.1.3` fixes PATH registration correctness so the MSI uses the actual install directory, repair/reinstall keep exactly one PATH entry, and uninstall removes that entry.
 
+The `0.2.0` source line adds Ubuntu SDK-free build/test support. It does not create Linux release binaries or Linux packages.
+
 ## Provenance
 
 Release artifacts are built by GitHub Actions from the public repository source and receive GitHub Artifact Attestations.
@@ -26,6 +28,8 @@ gh attestation verify nvafx-audio-cli-v0.1.3-windows-x64.msi -R tsuchim/nvafx-au
 The release workflow intentionally does not vendor NVIDIA SDK files, NVIDIA DLLs, NVIDIA models, headers, import libraries, installers, redistributables, generated media, or sample media.
 
 GitHub-hosted runners do not include NVIDIA Audio Effects SDK. Until a legal CI SDK setup exists, GitHub Actions-built binaries are SDK-free. They are useful for CLI validation, WAV I/O guardrails, `--dry-run`, `--check-sdk`, and package structure verification. Actual NVIDIA AFX processing still requires a local SDK-enabled build.
+
+Ubuntu CI in `0.2.0` validates SDK-free configure, build, CTest, hygiene, help, and version output only. It does not install NVIDIA drivers, CUDA, NVIDIA Audio Effects SDK, models, headers, import libraries, shared libraries, generated media, or sample media.
 
 NVIDIA SDK runtime and models remain external user-provided dependencies. Processing with an SDK-enabled build still requires explicit runtime/model arguments:
 

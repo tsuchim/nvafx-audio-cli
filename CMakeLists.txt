@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(nvafx_audio_cli VERSION 0.1.3 LANGUAGES CXX)
+project(nvafx_audio_cli VERSION 0.2.0 LANGUAGES CXX)
 
 option(NVAFX_ENABLE_SDK "Enable NVIDIA Audio Effects SDK integration" OFF)
 set(NVAFX_API_ROOT "" CACHE PATH "Path to the external Maxine AFX SDK API root containing include/ and lib/")
@@ -86,6 +86,8 @@ endif()
 include(CTest)
 
 if(BUILD_TESTING)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
     add_executable(wav-fixture tests/wav_fixture.cpp)
     target_compile_features(wav-fixture PRIVATE cxx_std_17)
 
@@ -110,6 +112,7 @@ if(BUILD_TESTING)
     set(ROUNDTRIP_EXE "$<TARGET_FILE:wav-roundtrip>")
     set(INSPECT_EXE "$<TARGET_FILE:wav-inspect>")
     set(WAV_STDOUT_EXE "$<TARGET_FILE:wav-stdout>")
+    set(TEST_HELPERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tests")
 
     add_test(NAME fixture-valid-pcm16-48k-mono
         COMMAND "${FIXTURE_EXE}" "${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav" 48000 1 pcm16)
@@ -140,8 +143,9 @@ if(BUILD_TESTING)
     set_tests_properties(fixture-valid-pcm16-16k-mono PROPERTIES FIXTURES_SETUP wav_files)
 
     add_test(NAME fixture-dummy-model
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
-            "New-Item -ItemType Directory -Force -Path '${TEST_DATA_DIR}' | Out-Null; Set-Content -LiteralPath '${TEST_DATA_DIR}/dummy_model.trtpkg' -Value 'not a real model'")
+        COMMAND "${CMAKE_COMMAND}"
+            "-DDUMMY_MODEL=${TEST_DATA_DIR}/dummy_model.trtpkg"
+            -P "${TEST_HELPERS_DIR}/create_dummy_model.cmake")
     set_tests_properties(fixture-dummy-model PROPERTIES FIXTURES_SETUP wav_files)
 
     add_test(NAME cli-help COMMAND "${CLI_EXE}" --help)
@@ -179,8 +183,12 @@ if(BUILD_TESTING)
     set_tests_properties(cli-model-dry-run-parsing PROPERTIES FIXTURES_REQUIRED wav_files)
 
     add_test(NAME cli-dry-run-does-not-create-output
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
-            "Remove-Item -LiteralPath '${TEST_DATA_DIR}/dry_run_should_not_exist.wav' -ErrorAction SilentlyContinue; & '${CLI_EXE}' --input '${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav' --output '${TEST_DATA_DIR}/dry_run_should_not_exist.wav' --effect denoiser --model '${TEST_DATA_DIR}/dummy_model.trtpkg' --dry-run; if (Test-Path -LiteralPath '${TEST_DATA_DIR}/dry_run_should_not_exist.wav') { exit 1 }")
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCLI_EXE=${CLI_EXE}"
+            "-DINPUT_WAV=${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav"
+            "-DOUTPUT_WAV=${TEST_DATA_DIR}/dry_run_should_not_exist.wav"
+            "-DMODEL_PATH=${TEST_DATA_DIR}/dummy_model.trtpkg"
+            -P "${TEST_HELPERS_DIR}/run_and_assert_no_output.cmake")
     set_tests_properties(cli-dry-run-does-not-create-output PROPERTIES FIXTURES_REQUIRED wav_files)
 
     add_test(NAME cli-dry-run-valid-pcm16-48k-mono
@@ -220,32 +228,61 @@ if(BUILD_TESTING)
     set_tests_properties(cli-sdk-disabled-processing-fails PROPERTIES FIXTURES_REQUIRED wav_files WILL_FAIL TRUE)
 
     add_test(NAME cli-help-documents-allow-unsafe-pipe
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
-            "& '${CLI_EXE}' --help | Select-String -SimpleMatch '--allow-unsafe-pipe' | Out-Null")
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCLI_EXE=${CLI_EXE}"
+            "-DMATCH_TEXT=--allow-unsafe-pipe"
+            -P "${TEST_HELPERS_DIR}/assert_help_contains.cmake")
 
     add_test(NAME cli-stdin-dry-run-valid
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
-            "$p = Start-Process -FilePath '${CLI_EXE}' -ArgumentList @('--input','-','--output','${TEST_DATA_DIR}/stdin_dry.wav','--effect','denoiser','--dry-run','--allow-unsafe-pipe') -RedirectStandardInput '${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav' -RedirectStandardOutput '${TEST_DATA_DIR}/stdin_dry_stdout.txt' -RedirectStandardError '${TEST_DATA_DIR}/stdin_dry_stderr.txt' -NoNewWindow -Wait -PassThru; exit $p.ExitCode")
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCLI_EXE=${CLI_EXE}"
+            "-DINPUT_WAV=${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav"
+            "-DOUTPUT_WAV=${TEST_DATA_DIR}/stdin_dry.wav"
+            "-DSTDOUT_FILE=${TEST_DATA_DIR}/stdin_dry_stdout.txt"
+            "-DSTDERR_FILE=${TEST_DATA_DIR}/stdin_dry_stderr.txt"
+            -P "${TEST_HELPERS_DIR}/run_stdin_dry_run.cmake")
     set_tests_properties(cli-stdin-dry-run-valid PROPERTIES FIXTURES_REQUIRED wav_files)
 
     add_test(NAME cli-dry-run-output-stdout-empty
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
-            "Remove-Item -LiteralPath '${TEST_DATA_DIR}/dry_pipe_stdout.bin','${TEST_DATA_DIR}/dry_pipe_stderr.txt' -ErrorAction SilentlyContinue; $p = Start-Process -FilePath '${CLI_EXE}' -ArgumentList @('--input','${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav','--output','-','--effect','denoiser','--dry-run','--allow-unsafe-pipe') -RedirectStandardOutput '${TEST_DATA_DIR}/dry_pipe_stdout.bin' -RedirectStandardError '${TEST_DATA_DIR}/dry_pipe_stderr.txt' -NoNewWindow -Wait -PassThru; if ($p.ExitCode -ne 0) { exit $p.ExitCode }; if ((Get-Item -LiteralPath '${TEST_DATA_DIR}/dry_pipe_stdout.bin').Length -ne 0) { exit 1 }")
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCLI_EXE=${CLI_EXE}"
+            "-DINPUT_WAV=${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav"
+            "-DSTDOUT_FILE=${TEST_DATA_DIR}/dry_pipe_stdout.bin"
+            "-DSTDERR_FILE=${TEST_DATA_DIR}/dry_pipe_stderr.txt"
+            -P "${TEST_HELPERS_DIR}/run_dry_run_stdout_empty.cmake")
     set_tests_properties(cli-dry-run-output-stdout-empty PROPERTIES FIXTURES_REQUIRED wav_files)
 
     add_test(NAME cli-invalid-stdin-helpful-error
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
-            "Set-Content -LiteralPath '${TEST_DATA_DIR}/invalid_stdin.txt' -Value 'not a wav'; $p = Start-Process -FilePath '${CLI_EXE}' -ArgumentList @('--input','-','--output','${TEST_DATA_DIR}/invalid_stdin_out.wav','--effect','denoiser','--dry-run','--allow-unsafe-pipe') -RedirectStandardInput '${TEST_DATA_DIR}/invalid_stdin.txt' -RedirectStandardOutput '${TEST_DATA_DIR}/invalid_stdin_stdout.txt' -RedirectStandardError '${TEST_DATA_DIR}/invalid_stdin_stderr.txt' -NoNewWindow -Wait -PassThru; if ($p.ExitCode -eq 0) { exit 1 }; Select-String -LiteralPath '${TEST_DATA_DIR}/invalid_stdin_stderr.txt' -SimpleMatch 'valid RIFF/WAVE stream' | Out-Null")
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCLI_EXE=${CLI_EXE}"
+            "-DINVALID_STDIN=${TEST_DATA_DIR}/invalid_stdin.txt"
+            "-DOUTPUT_WAV=${TEST_DATA_DIR}/invalid_stdin_out.wav"
+            "-DSTDOUT_FILE=${TEST_DATA_DIR}/invalid_stdin_stdout.txt"
+            "-DSTDERR_FILE=${TEST_DATA_DIR}/invalid_stdin_stderr.txt"
+            "-DEXPECTED_TEXT=valid RIFF/WAVE stream"
+            -P "${TEST_HELPERS_DIR}/run_invalid_stdin_error.cmake")
     set_tests_properties(cli-invalid-stdin-helpful-error PROPERTIES FIXTURES_REQUIRED wav_files)
 
     add_test(NAME cli-sdk-disabled-output-stdout-clean
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
-            "Remove-Item -LiteralPath '${TEST_DATA_DIR}/disabled_pipe_stdout.bin','${TEST_DATA_DIR}/disabled_pipe_stderr.txt' -ErrorAction SilentlyContinue; $p = Start-Process -FilePath '${CLI_EXE}' -ArgumentList @('--input','${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav','--output','-','--effect','denoiser','--model','${TEST_DATA_DIR}/dummy_model.trtpkg','--runtime-root','${TEST_DATA_DIR}','--allow-unsafe-pipe') -RedirectStandardOutput '${TEST_DATA_DIR}/disabled_pipe_stdout.bin' -RedirectStandardError '${TEST_DATA_DIR}/disabled_pipe_stderr.txt' -NoNewWindow -Wait -PassThru; if ($p.ExitCode -eq 0) { exit 1 }; if ((Get-Item -LiteralPath '${TEST_DATA_DIR}/disabled_pipe_stdout.bin').Length -ne 0) { exit 1 }; Select-String -LiteralPath '${TEST_DATA_DIR}/disabled_pipe_stderr.txt' -SimpleMatch 'SDK support is not enabled' | Out-Null")
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCLI_EXE=${CLI_EXE}"
+            "-DINPUT_WAV=${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav"
+            "-DMODEL_PATH=${TEST_DATA_DIR}/dummy_model.trtpkg"
+            "-DRUNTIME_ROOT=${TEST_DATA_DIR}"
+            "-DSTDOUT_FILE=${TEST_DATA_DIR}/disabled_pipe_stdout.bin"
+            "-DSTDERR_FILE=${TEST_DATA_DIR}/disabled_pipe_stderr.txt"
+            "-DEXPECTED_TEXT=SDK support is not enabled"
+            -P "${TEST_HELPERS_DIR}/run_sdk_disabled_stdout_clean.cmake")
     set_tests_properties(cli-sdk-disabled-output-stdout-clean PROPERTIES FIXTURES_REQUIRED wav_files)
 
     add_test(NAME wav-stream-stdout-roundtrip
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
-            "$p = Start-Process -FilePath '${WAV_STDOUT_EXE}' -ArgumentList @('${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav') -RedirectStandardOutput '${TEST_DATA_DIR}/stream_stdout.wav' -RedirectStandardError '${TEST_DATA_DIR}/stream_stdout_stderr.txt' -NoNewWindow -Wait -PassThru; if ($p.ExitCode -ne 0) { exit $p.ExitCode }; & '${INSPECT_EXE}' '${TEST_DATA_DIR}/stream_stdout.wav' 48000 1 4")
+        COMMAND "${CMAKE_COMMAND}"
+            "-DWAV_STDOUT_EXE=${WAV_STDOUT_EXE}"
+            "-DINSPECT_EXE=${INSPECT_EXE}"
+            "-DINPUT_WAV=${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav"
+            "-DOUTPUT_WAV=${TEST_DATA_DIR}/stream_stdout.wav"
+            "-DSTDERR_FILE=${TEST_DATA_DIR}/stream_stdout_stderr.txt"
+            -P "${TEST_HELPERS_DIR}/run_wav_stream_stdout_roundtrip.cmake")
     set_tests_properties(wav-stream-stdout-roundtrip PROPERTIES FIXTURES_REQUIRED wav_files)
 
     add_test(NAME cli-check-sdk-missing-roots
@@ -253,10 +290,12 @@ if(BUILD_TESTING)
     set_tests_properties(cli-check-sdk-missing-roots PROPERTIES WILL_FAIL TRUE)
 
     add_test(NAME cli-check-sdk-fake-tree
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
-            "New-Item -ItemType Directory -Force -Path '${TEST_DATA_DIR}/fake_api/include', '${TEST_DATA_DIR}/fake_api/lib', '${TEST_DATA_DIR}/fake_runtime/models' | Out-Null; Set-Content -LiteralPath '${TEST_DATA_DIR}/fake_api/include/nvAudioEffects.h' -Value ''; Set-Content -LiteralPath '${TEST_DATA_DIR}/fake_api/lib/NVAudioEffects.lib' -Value ''; Set-Content -LiteralPath '${TEST_DATA_DIR}/fake_runtime/NVAudioEffects.dll' -Value ''; Set-Content -LiteralPath '${TEST_DATA_DIR}/fake_runtime/models/denoiser_48k.trtpkg' -Value ''; Set-Content -LiteralPath '${TEST_DATA_DIR}/fake_runtime/models/dereverb_48k.trtpkg' -Value ''; Set-Content -LiteralPath '${TEST_DATA_DIR}/fake_runtime/models/dereverb_denoiser_48k.trtpkg' -Value ''; & '${CLI_EXE}' --check-sdk --api-root '${TEST_DATA_DIR}/fake_api' --runtime-root '${TEST_DATA_DIR}/fake_runtime'")
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCLI_EXE=${CLI_EXE}"
+            "-DTEST_DATA_DIR=${TEST_DATA_DIR}"
+            -P "${TEST_HELPERS_DIR}/run_check_sdk_fake_tree.cmake")
 
     add_test(NAME repo-hygiene
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_repo_hygiene.ps1")
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_repo_hygiene.py")
     set_tests_properties(repo-hygiene PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()

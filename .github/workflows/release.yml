@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version without leading v, for example 0.1.3
+        description: Release version without leading v, for example 0.2.0
         required: true
-        default: 0.1.3
+        default: 0.2.0
   push:
     tags:
       - 'v*'
@@ -57,7 +57,7 @@ jobs:
         run: ctest --test-dir build-release -C Release --output-on-failure
 
       - name: Repository hygiene
-        run: .\scripts\check_repo_hygiene.ps1
+        run: python scripts/check_repo_hygiene.py
 
       - name: Install WiX Toolset
         shell: pwsh

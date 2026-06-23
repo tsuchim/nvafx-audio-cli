@@ -1,10 +1,10 @@
 # Initial Design
 
-`nvafx-audio-cli` is a small Windows-first command-line project for offline WAV processing with NVIDIA Audio Effects SDK.
+`nvafx-audio-cli` is a small Windows-first command-line project for offline WAV processing with NVIDIA Audio Effects SDK. The `0.2.0` source line adds Ubuntu SDK-free build and test support.
 
 ## Scope
 
-- Windows-first CLI.
+- Windows-first CLI with Ubuntu SDK-free validation support.
 - C++17.
 - CMake build.
 - No GUI.
@@ -54,6 +54,8 @@ If CMake cache variables are absent, `NVAFX_API_ROOT` and `NVAFX_RUNTIME_ROOT` e
 
 A structurally plausible setup has `include\nvAudioEffects.h`, `lib\NVAudioEffects.lib`, `NVAudioEffects.dll`, and a `models` directory.
 
+In `0.2.0`, SDK-enabled discovery and processing remain Windows-oriented. Ubuntu support is SDK-free only; NVIDIA Linux SDK runtime loading, `.so` handling, CUDA setup, and GPU processing are deferred.
+
 
 ## Pipe I/O
 
@@ -91,10 +93,11 @@ Unsupported formats, bit depths, channel counts, sample rates, truncated files, 
 The release gate is intentionally minimal but checks guardrails:
 
 - Clean Windows build from checkout.
+- Clean Ubuntu SDK-free build from checkout.
 - Full CTest suite.
 - CLI public contract for help, version, invalid effect, invalid numeric options, and unimplemented SDK processing.
 - WAV guardrails for supported generated inputs, unsupported sample rate, unsupported channel count, malformed or truncated WAV, and writer round-trip.
-- Repository hygiene through `scripts/check_repo_hygiene.ps1`.
+- Cross-platform repository hygiene through `scripts/check_repo_hygiene.py`.
 - No NVIDIA SDK requirement.
 
 Development branches should run the same checks locally instead of using GitHub Actions as routine confirmation.
@@ -110,4 +113,3 @@ The workflow intentionally does not require or include NVIDIA SDK files. Until a
 The SDK adapter is isolated in `src/afx_sdk.cpp` and `src/afx_sdk.hpp`. All direct NVIDIA includes and SDK calls stay there. Processing reads WAV into planar float buffers, loads the requested SDK effect with an explicit `--model`, queries SDK frame size, sample rate, and channel constraints, processes padded frames, trims the final output to the original frame count, and writes 32-bit float WAV.
 
 Mono processing is supported for the tested installed models. Stereo is accepted by the WAV reader but rejected for SDK processing when the loaded effect/model reports mono-only input and output channels. The CLI does not process stereo channels independently because the SDK effect contract does not document that as equivalent.
-
