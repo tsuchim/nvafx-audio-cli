@@ -45,6 +45,10 @@ Starting with `v0.1.3`, the MSI adds its actual install directory to the machine
 
 MSI packages remain unsigned unless Authenticode signing is added later. Unsigned MSI packages may show Windows publisher or SmartScreen warnings.
 
+Authenticode signing and future APT archive signing are managed as centralized Eikai Intelligent Systems release infrastructure outside this project repository. No signing secrets, private keys, certificates, PFX files, or package archive secret material are stored in this repository.
+
 GitHub Artifact Attestation is separate from Authenticode signing. Attestation proves repository/workflow provenance for a release artifact; it does not make Windows treat the executable or MSI as a signed publisher binary.
 
-MSIX is deferred until trusted package signing is available. No MSIX package is produced for `v0.1.3`.
+APT publishing is future work. The `0.2.0` release line provides Ubuntu SDK-free source build and test support only; it does not produce Linux packages or Linux release binaries.
+
+MSIX is deferred until trusted package signing is available. No MSIX package is produced for `v0.2.0`.
