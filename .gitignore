@@ -63,6 +63,7 @@ features/
 sdk/
 third_party/nvidia/
 *.zip
+*.deb
 *.7z
 *.tar
 *.tar.gz

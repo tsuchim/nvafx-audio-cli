@@ -2,7 +2,7 @@
 
 Small offline WAV processing CLI for NVIDIA Audio Effects SDK.
 
-This project is a small Windows-first command-line tool that processes WAV files offline through a locally installed NVIDIA Audio Effects SDK. Ubuntu SDK-free build and test support starts in the `0.2.0` source line.
+This project is a small Windows-first command-line tool that processes WAV files offline through a locally installed NVIDIA Audio Effects SDK. Ubuntu SDK-free build and test support starts in the `0.2.0` source line, and Ubuntu/Debian `.deb` packaging starts in the `0.2.1` source line.
 
 NVIDIA SDK binaries, models, AI features, redistributables, installers, generated audio/video files, and sample media are not included in this repository. The official NVIDIA Maxine AFX SDK API repository is used only as a local build dependency and is not vendored here.
 
@@ -98,7 +98,7 @@ Ubuntu SDK-free build:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config ffmpeg ca-certificates git python3
+sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config ffmpeg ca-certificates git python3 dpkg-dev file
 cmake -S . -B build-linux -G Ninja
 cmake --build build-linux
 ctest --test-dir build-linux --output-on-failure
@@ -106,7 +106,24 @@ python3 scripts/check_repo_hygiene.py
 ./build-linux/nvafx-audio-cli --version
 ```
 
-The Ubuntu SDK-free build supports `--help`, `--version`, `--dry-run`, WAV read/write guardrails, `--check-sdk` structural checks, and clear failure when actual processing is requested without SDK support. It does not include NVIDIA SDK runtime processing on Linux, `.so` runtime loading, CUDA setup, GPU assumptions, Linux release binaries, or Linux packages.
+The Ubuntu SDK-free build supports `--help`, `--version`, `--dry-run`, WAV read/write guardrails, `--check-sdk` structural checks, and clear failure when actual processing is requested without SDK support. It does not include NVIDIA SDK runtime processing on Linux, `.so` runtime loading, CUDA setup, or GPU assumptions.
+
+Ubuntu/Debian SDK-free package build:
+
+```bash
+cmake -S . -B build-linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+cmake --build build-linux
+cpack --config build-linux/CPackConfig.cmake -G DEB -B build-linux/package
+python3 scripts/check_deb_package.py build-linux/package/nvafx-audio-cli_0.2.1_amd64.deb
+```
+
+Once a release provides the `.deb`, install it manually with:
+
+```bash
+sudo apt install ./nvafx-audio-cli_0.2.1_amd64.deb
+```
+
+The `.deb` package is SDK-free. It installs `nvafx-audio-cli` to `/usr/bin` and project documentation to `/usr/share/doc/nvafx-audio-cli/`. It does not include NVIDIA SDK runtime files, shared libraries, models, CUDA setup, generated media, or sample media. APT repository publishing is future work.
 
 Windows SDK-free build:
 
@@ -124,7 +141,7 @@ cmake -S . -B build-sdk -DNVAFX_ENABLE_SDK=ON -DNVAFX_API_ROOT=C:\Path\To\Maxine
 cmake --build build-sdk --config Release
 ```
 
-`NVAFX_API_ROOT` must point to the external API root containing `include\nvAudioEffects.h` and `lib\NVAudioEffects.lib`. `NVAFX_RUNTIME_ROOT` must point to the installed runtime root containing `NVAudioEffects.dll` and `models\*.trtpkg`. Environment variables with the same names are also accepted; `AFX_SDK_ROOT` remains a runtime-root compatibility fallback. This SDK-enabled path remains Windows-oriented in `0.2.0`; NVIDIA Linux SDK-enabled processing is a later phase.
+`NVAFX_API_ROOT` must point to the external API root containing `include\nvAudioEffects.h` and `lib\NVAudioEffects.lib`. `NVAFX_RUNTIME_ROOT` must point to the installed runtime root containing `NVAudioEffects.dll` and `models\*.trtpkg`. Environment variables with the same names are also accepted; `AFX_SDK_ROOT` remains a runtime-root compatibility fallback. This SDK-enabled path remains Windows-oriented in `0.2.1`; NVIDIA Linux SDK-enabled processing is a later phase.
 
 The main release gate runs on pull requests targeting `main` only. It performs clean Windows and Ubuntu SDK-free builds, CTest guardrails, repository hygiene checks, and CLI public-contract checks without requiring NVIDIA Audio Effects SDK.
 
@@ -133,7 +150,7 @@ See `docs/linux.md` for Ubuntu-specific notes.
 
 ## Release Packaging
 
-`v0.1.0` was the initial manual binary/MSI release. `v0.1.1` is the first GitHub Actions-built and GitHub-attested release. `v0.1.2` added MSI machine `PATH` registration. `v0.1.3` fixes PATH registration correctness so the MSI uses the actual install directory and repair/reinstall do not create duplicates; reopen existing terminals after installing. The `0.2.0` source line adds Ubuntu SDK-free build/test foundation only; it does not create Linux release binaries. The MSI does not add NVIDIA SDK/runtime/model paths to `PATH`. See `docs/release-packaging.md` for provenance, SDK-free CI binary, MSI, and signing notes.
+`v0.1.0` was the initial manual binary/MSI release. `v0.1.1` is the first GitHub Actions-built and GitHub-attested release. `v0.1.2` added MSI machine `PATH` registration. `v0.1.3` fixes PATH registration correctness so the MSI uses the actual install directory and repair/reinstall do not create duplicates; reopen existing terminals after installing. The `0.2.0` source line adds Ubuntu SDK-free build/test foundation only. The `0.2.1` source line adds Ubuntu/Debian `.deb` packaging for the SDK-free build. The MSI and `.deb` packages do not include NVIDIA SDK/runtime/model files. See `docs/release-packaging.md` for provenance, SDK-free CI binary, MSI, Debian package, and signing notes.
 ## Current Status
 
 The CLI, SDK discovery checks, WAV I/O, Windows NVIDIA AFX SDK processing path, and Ubuntu SDK-free build/test path are implemented. The default build remains SDK-free and fails clearly if processing is requested without SDK support.

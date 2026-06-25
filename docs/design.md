@@ -105,9 +105,9 @@ Development branches should run the same checks locally instead of using GitHub 
 
 ## Release Packaging Workflow
 
-`.github/workflows/release.yml` creates GitHub Actions-built release assets for explicit release tags or manual release dispatch. The workflow builds the public SDK-free executable, creates the zip and MSI packages, writes `SHA256SUMS.txt`, publishes the GitHub Release, and emits GitHub Artifact Attestations.
+`.github/workflows/release.yml` creates GitHub Actions-built release assets for explicit release tags or manual release dispatch. The workflow builds the public SDK-free Windows executable, creates the zip and MSI packages, builds the SDK-free Ubuntu/Debian `.deb` package, writes `SHA256SUMS.txt`, publishes the GitHub Release, and emits GitHub Artifact Attestations.
 
-The workflow intentionally does not require or include NVIDIA SDK files. Until a legal CI SDK setup exists, attested CI binaries are SDK-free and actual AFX processing remains a local SDK-enabled build path.
+The workflow intentionally does not require or include NVIDIA SDK files. Until a legal CI SDK setup exists, attested CI binaries and the `.deb` package are SDK-free and actual AFX processing remains a local SDK-enabled build path. The workflow does not publish an APT repository and does not perform production APT signing.
 ## Processing
 
 The SDK adapter is isolated in `src/afx_sdk.cpp` and `src/afx_sdk.hpp`. All direct NVIDIA includes and SDK calls stay there. Processing reads WAV into planar float buffers, loads the requested SDK effect with an explicit `--model`, queries SDK frame size, sample rate, and channel constraints, processes padded frames, trims the final output to the original frame count, and writes 32-bit float WAV.
