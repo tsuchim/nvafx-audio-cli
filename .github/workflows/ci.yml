@@ -39,10 +39,10 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Install packages
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build ffmpeg dpkg-dev
 
       - name: Configure
-        run: cmake -S . -B build-linux -G Ninja
+        run: cmake -S . -B build-linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
 
       - name: Build
         run: cmake --build build-linux
@@ -58,3 +58,14 @@ jobs:
 
       - name: Verify version
         run: ./build-linux/nvafx-audio-cli --version
+
+      - name: Build Debian package
+        run: cpack --config build-linux/CPackConfig.cmake -G DEB -B build-linux/package
+
+      - name: Inspect Debian package
+        run: |
+          deb="$(find build-linux/package -maxdepth 1 -type f -name 'nvafx-audio-cli_*.deb' -print -quit)"
+          test -n "$deb"
+          dpkg-deb --field "$deb"
+          dpkg-deb --contents "$deb"
+          python3 scripts/check_deb_package.py "$deb"

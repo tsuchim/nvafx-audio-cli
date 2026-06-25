@@ -8,7 +8,7 @@
 
 `v0.1.2` added MSI machine `PATH` registration. `v0.1.3` fixes PATH registration correctness so the MSI uses the actual install directory, repair/reinstall keep exactly one PATH entry, and uninstall removes that entry.
 
-The `0.2.0` source line adds Ubuntu SDK-free build/test support. It does not create Linux release binaries or Linux packages.
+The `0.2.0` source line adds Ubuntu SDK-free build/test support. The `0.2.1` source line adds Ubuntu/Debian `.deb` packaging for the SDK-free Linux build.
 
 ## Provenance
 
@@ -29,13 +29,36 @@ The release workflow intentionally does not vendor NVIDIA SDK files, NVIDIA DLLs
 
 GitHub-hosted runners do not include NVIDIA Audio Effects SDK. Until a legal CI SDK setup exists, GitHub Actions-built binaries are SDK-free. They are useful for CLI validation, WAV I/O guardrails, `--dry-run`, `--check-sdk`, and package structure verification. Actual NVIDIA AFX processing still requires a local SDK-enabled build.
 
-Ubuntu CI in `0.2.0` validates SDK-free configure, build, CTest, hygiene, help, and version output only. It does not install NVIDIA drivers, CUDA, NVIDIA Audio Effects SDK, models, headers, import libraries, shared libraries, generated media, or sample media.
+Ubuntu CI validates SDK-free configure, build, CTest, hygiene, help, version output, and `.deb` package structure. It does not install NVIDIA drivers, CUDA, NVIDIA Audio Effects SDK, models, headers, import libraries, shared libraries, generated media, or sample media.
 
 NVIDIA SDK runtime and models remain external user-provided dependencies. Processing with an SDK-enabled build still requires explicit runtime/model arguments:
 
 ```powershell
 nvafx-audio-cli --input in.wav --output out.wav --effect denoiser --sample-rate 48000 --model C:\Path\To\denoiser_48k.trtpkg --runtime-root C:\Path\To\NVIDIA-Audio-Effects-SDK
 ```
+
+## Debian package
+
+Starting with `v0.2.1`, the release workflow is prepared to produce an Ubuntu/Debian `.deb` package for the SDK-free Linux build:
+
+```text
+nvafx-audio-cli_0.2.1_amd64.deb
+```
+
+The package installs:
+
+```text
+/usr/bin/nvafx-audio-cli
+/usr/share/doc/nvafx-audio-cli/
+```
+
+Manual install after download:
+
+```bash
+sudo apt install ./nvafx-audio-cli_0.2.1_amd64.deb
+```
+
+The `.deb` package does not include NVIDIA SDK/runtime/model files, CUDA setup, generated media, or sample media. NVIDIA Linux SDK-enabled processing remains future work.
 
 ## MSI and signing
 
@@ -49,6 +72,6 @@ Authenticode signing and future APT archive signing are managed as centralized E
 
 GitHub Artifact Attestation is separate from Authenticode signing. Attestation proves repository/workflow provenance for a release artifact; it does not make Windows treat the executable or MSI as a signed publisher binary.
 
-APT publishing is future work. The `0.2.0` release line provides Ubuntu SDK-free source build and test support only; it does not produce Linux packages or Linux release binaries.
+APT publishing is future work. APT signing identity and public key inventory are centrally managed by `local-infra`, but production APT repository signing and publication are not enabled in this project workflow.
 
-MSIX is deferred until trusted package signing is available. No MSIX package is produced for `v0.2.0`.
+MSIX is deferred until trusted package signing is available. No MSIX package is produced for `v0.2.1`.

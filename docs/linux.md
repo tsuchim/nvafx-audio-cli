@@ -1,6 +1,6 @@
 # Ubuntu SDK-Free Support
 
-`nvafx-audio-cli` `0.2.0` adds first-class Ubuntu SDK-free configure, build, and test support. This foundation is intended for CLI validation, WAV I/O guardrails, dry-run behavior, and repository hygiene without NVIDIA SDK files.
+`nvafx-audio-cli` `0.2.0` adds first-class Ubuntu SDK-free configure, build, and test support. The `0.2.1` source line adds Ubuntu/Debian `.deb` packaging for that SDK-free build. This foundation is intended for CLI validation, WAV I/O guardrails, dry-run behavior, repository hygiene, and package structure validation without NVIDIA SDK files.
 
 ## Prerequisites
 
@@ -27,8 +27,34 @@ python3 scripts/check_repo_hygiene.py
 `./build-linux/nvafx-audio-cli --version` should print:
 
 ```text
-nvafx-audio-cli 0.2.0
+nvafx-audio-cli 0.2.1
 ```
+
+## Debian Package
+
+Build the SDK-free `.deb` package:
+
+```bash
+cmake -S . -B build-linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+cmake --build build-linux
+cpack --config build-linux/CPackConfig.cmake -G DEB -B build-linux/package
+python3 scripts/check_deb_package.py build-linux/package/nvafx-audio-cli_0.2.1_amd64.deb
+```
+
+The package installs:
+
+```text
+/usr/bin/nvafx-audio-cli
+/usr/share/doc/nvafx-audio-cli/
+```
+
+After a release provides the `.deb`, install it manually:
+
+```bash
+sudo apt install ./nvafx-audio-cli_0.2.1_amd64.deb
+```
+
+This package is SDK-free. It does not include NVIDIA SDK runtime files, shared libraries, models, CUDA setup, generated media, or sample media. NVIDIA Linux SDK-enabled processing remains future work.
 
 ## What Works
 
@@ -40,6 +66,7 @@ nvafx-audio-cli 0.2.0
 - `--check-sdk` structural checks
 - Clear SDK-disabled failure when processing is requested from an SDK-free build
 - Cross-platform repository hygiene through `scripts/check_repo_hygiene.py`
+- SDK-free Debian package structure validation through `scripts/check_deb_package.py`
 
 ## Not In Scope Yet
 
@@ -47,8 +74,13 @@ nvafx-audio-cli 0.2.0
 - Loading NVIDIA `.so` runtime libraries
 - CUDA setup
 - GPU processing assumptions
-- Linux release binaries
-- `.deb`, AppImage, Snap, or Flatpak packaging
+- APT repository publishing
+- APT repository signing
+- AppImage, Snap, or Flatpak packaging
+
+## APT Publishing
+
+APT repository publishing remains future work. APT signing identity and public key inventory are centrally managed by `local-infra`, but this project does not publish an APT repository and does not use production APT signing in the v0.2.1 package workflow.
 
 ## SDK Artifact Policy
 

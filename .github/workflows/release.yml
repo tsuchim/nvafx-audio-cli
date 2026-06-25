@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version without leading v, for example 0.2.0
+        description: Release version without leading v, for example 0.2.1
         required: true
-        default: 0.2.0
+        default: 0.2.1
   push:
     tags:
       - 'v*'
@@ -17,35 +17,58 @@ permissions:
   attestations: write
 
 jobs:
-  build-release:
+  metadata:
+    runs-on: ubuntu-latest
+
+    outputs:
+      release_version: ${{ steps.resolve.outputs.release_version }}
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      windows_package: ${{ steps.resolve.outputs.windows_package }}
+      linux_deb: ${{ steps.resolve.outputs.linux_deb }}
+
+    steps:
+      - name: Resolve release version
+        id: resolve
+        shell: bash
+        run: |
+          version='${{ github.event.inputs.version }}'
+          if [[ '${{ github.ref_type }}' != 'tag' || '${{ github.ref_name }}' != v* ]]; then
+            echo 'Release workflow must run from a v* tag ref.' >&2
+            exit 1
+          fi
+          tag_version='${{ github.ref_name }}'
+          tag_version="${tag_version#v}"
+          if [[ -z "$version" ]]; then
+            version="$tag_version"
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version must be major.minor.patch: $version" >&2
+            exit 1
+          fi
+          if [[ "$version" != "$tag_version" ]]; then
+            echo "Version input '$version' does not match tag version '$tag_version'." >&2
+            exit 1
+          fi
+          {
+            echo "release_version=$version"
+            echo "release_tag=v$version"
+            echo "windows_package=nvafx-audio-cli-v$version-windows-x64"
+            echo "linux_deb=nvafx-audio-cli_${version}_amd64.deb"
+          } >> "$GITHUB_OUTPUT"
+
+  build-windows:
     runs-on: windows-latest
+    needs: metadata
+
+    env:
+      RELEASE_VERSION: ${{ needs.metadata.outputs.release_version }}
+      PACKAGE_NAME: ${{ needs.metadata.outputs.windows_package }}
 
     steps:
       - name: Check out release ref
         uses: actions/checkout@v7
         with:
           ref: ${{ github.ref }}
-
-      - name: Resolve release version
-        shell: pwsh
-        run: |
-          $version = '${{ github.event.inputs.version }}'
-          if ('${{ github.ref_type }}' -ne 'tag' -or -not '${{ github.ref_name }}'.StartsWith('v')) {
-            throw 'Release workflow must run from a v* tag ref.'
-          }
-          $tagVersion = '${{ github.ref_name }}'.Substring(1)
-          if ([string]::IsNullOrWhiteSpace($version)) {
-            $version = $tagVersion
-          }
-          if ($version -notmatch '^\d+\.\d+\.\d+$') {
-            throw "Version must be major.minor.patch: $version"
-          }
-          if ($version -ne $tagVersion) {
-            throw "Version input '$version' does not match tag version '$tagVersion'."
-          }
-          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
-          "RELEASE_TAG=v$version" >> $env:GITHUB_ENV
-          "PACKAGE_NAME=nvafx-audio-cli-v$version-windows-x64" >> $env:GITHUB_ENV
 
       - name: Configure SDK-free release build
         run: cmake -S . -B build-release
@@ -135,23 +158,13 @@ jobs:
             -CustomActionDll 'build-release\Release\nvafx-msi-custom-actions.dll' `
             -WixPath '.\.wix\wix.exe'
 
-      - name: Create zip package and checksums
+      - name: Create zip package
         shell: pwsh
         run: |
           $packageDir = Join-Path 'build-release-package' $env:PACKAGE_NAME
           $zipPath = Join-Path 'build-release-package' "$env:PACKAGE_NAME.zip"
-          $msiPath = Join-Path 'build-release-package' "$env:PACKAGE_NAME.msi"
           Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
           Compress-Archive -Path (Join-Path $packageDir '*') -DestinationPath $zipPath -CompressionLevel Optimal
-          $exeHash = (Get-FileHash -Algorithm SHA256 (Join-Path $packageDir 'nvafx-audio-cli.exe')).Hash.ToLowerInvariant()
-          $zipHash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLowerInvariant()
-          $msiHash = (Get-FileHash -Algorithm SHA256 $msiPath).Hash.ToLowerInvariant()
-          @(
-            "$zipHash  $env:PACKAGE_NAME.zip",
-            "$msiHash  $env:PACKAGE_NAME.msi",
-            "$exeHash  nvafx-audio-cli.exe"
-          ) | Set-Content -Encoding ascii -LiteralPath 'build-release-package\SHA256SUMS.txt'
-          Get-Content -LiteralPath 'build-release-package\SHA256SUMS.txt'
 
       - name: Attest zip package
         uses: actions/attest-build-provenance@v2
@@ -168,16 +181,115 @@ jobs:
         with:
           subject-path: build-release-package/${{ env.PACKAGE_NAME }}/nvafx-audio-cli.exe
 
+      - name: Upload Windows assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-assets
+          path: |
+            build-release-package/${{ env.PACKAGE_NAME }}.zip
+            build-release-package/${{ env.PACKAGE_NAME }}.msi
+            build-release-package/${{ env.PACKAGE_NAME }}/nvafx-audio-cli.exe
+          if-no-files-found: error
+
+  build-linux-deb:
+    runs-on: ubuntu-latest
+    needs: metadata
+
+    steps:
+      - name: Check out release ref
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Install packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build ffmpeg dpkg-dev
+
+      - name: Configure SDK-free Debian package build
+        run: cmake -S . -B build-linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+
+      - name: Build SDK-free Linux binary
+        run: cmake --build build-linux
+
+      - name: Run SDK-free tests
+        run: ctest --test-dir build-linux --output-on-failure
+
+      - name: Repository hygiene
+        run: python3 scripts/check_repo_hygiene.py
+
+      - name: Verify help
+        run: ./build-linux/nvafx-audio-cli --help
+
+      - name: Verify version
+        run: ./build-linux/nvafx-audio-cli --version
+
+      - name: Build Debian package
+        run: cpack --config build-linux/CPackConfig.cmake -G DEB -B build-linux/package
+
+      - name: Validate Debian package
+        run: |
+          deb="$(find build-linux/package -maxdepth 1 -type f -name '${{ needs.metadata.outputs.linux_deb }}' -print -quit)"
+          test -n "$deb"
+          dpkg-deb --field "$deb"
+          dpkg-deb --contents "$deb"
+          python3 scripts/check_deb_package.py "$deb"
+
+      - name: Attest Debian package
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: build-linux/package/${{ needs.metadata.outputs.linux_deb }}
+
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
+          path: build-linux/package/${{ needs.metadata.outputs.linux_deb }}
+          if-no-files-found: error
+
+  publish-release:
+    runs-on: ubuntu-latest
+    needs:
+      - metadata
+      - build-windows
+      - build-linux-deb
+
+    env:
+      RELEASE_VERSION: ${{ needs.metadata.outputs.release_version }}
+      RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
+      PACKAGE_NAME: ${{ needs.metadata.outputs.windows_package }}
+      LINUX_DEB: ${{ needs.metadata.outputs.linux_deb }}
+
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create checksums
+        shell: bash
+        run: |
+          mkdir -p build-release-package
+          zip="dist/windows-assets/$PACKAGE_NAME.zip"
+          msi="dist/windows-assets/$PACKAGE_NAME.msi"
+          exe="dist/windows-assets/$PACKAGE_NAME/nvafx-audio-cli.exe"
+          deb="dist/linux-deb/$LINUX_DEB"
+          sha256sum "$zip" "$msi" "$deb" "$exe" |
+            sed -e "s#  $zip#  $PACKAGE_NAME.zip#" \
+                -e "s#  $msi#  $PACKAGE_NAME.msi#" \
+                -e "s#  $deb#  $LINUX_DEB#" \
+                -e "s#  $exe#  nvafx-audio-cli.exe#" \
+            > build-release-package/SHA256SUMS.txt
+          cat build-release-package/SHA256SUMS.txt
+
       - name: Attest checksums
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: build-release-package/SHA256SUMS.txt
 
       - name: Write release notes
-        shell: pwsh
+        shell: bash
         run: |
-          @"
-          ## nvafx-audio-cli v$env:RELEASE_VERSION
+          cat > build-release-package/RELEASE_NOTES.md <<EOF
+          ## nvafx-audio-cli v$RELEASE_VERSION
 
           Windows-first offline WAV processing CLI for NVIDIA Audio Effects SDK.
 
@@ -187,9 +299,27 @@ jobs:
 
           Download:
 
-          - $env:PACKAGE_NAME.zip
-          - $env:PACKAGE_NAME.msi
+          - $PACKAGE_NAME.zip
+          - $PACKAGE_NAME.msi
+          - $LINUX_DEB
           - SHA256SUMS.txt
+
+          ### Ubuntu/Debian package
+
+          v$RELEASE_VERSION adds an Ubuntu/Debian .deb package for the SDK-free Linux build.
+
+          Manual install after download:
+
+              sudo apt install ./$LINUX_DEB
+
+          The .deb installs:
+
+          - /usr/bin/nvafx-audio-cli
+          - /usr/share/doc/nvafx-audio-cli/
+
+          This package is SDK-free. It does not include NVIDIA SDK files, NVIDIA shared libraries, NVIDIA models, CUDA setup, generated media, or sample media. NVIDIA Linux SDK-enabled processing remains future work.
+
+          APT repository publishing is not enabled in this release workflow. Production APT signing is managed outside this repository and is not used here.
 
           ### Provenance and verification
 
@@ -199,40 +329,20 @@ jobs:
 
           Example verification:
 
-              gh attestation verify $env:PACKAGE_NAME.zip -R tsuchim/nvafx-audio-cli
-              gh attestation verify $env:PACKAGE_NAME.msi -R tsuchim/nvafx-audio-cli
+              gh attestation verify $PACKAGE_NAME.zip -R tsuchim/nvafx-audio-cli
+              gh attestation verify $PACKAGE_NAME.msi -R tsuchim/nvafx-audio-cli
+              gh attestation verify $LINUX_DEB -R tsuchim/nvafx-audio-cli
 
           ### Important SDK note
 
-          The GitHub-attested CI binary is SDK-free because GitHub-hosted runners do not include NVIDIA Audio Effects SDK and this workflow does not vendor, scrape, or download restricted NVIDIA SDK files.
+          GitHub-hosted runners do not include NVIDIA Audio Effects SDK and this workflow does not vendor, scrape, or download restricted NVIDIA SDK files.
 
-          The CI binary is useful for CLI validation, WAV I/O guardrails, --dry-run, --check-sdk, and documentation/package structure. Actual NVIDIA AFX processing still requires a local SDK-enabled build until a legal CI SDK setup exists.
-
-          This release does not include NVIDIA SDK files, NVIDIA DLLs, NVIDIA models, headers, import libraries, redistributables, installers, generated media, or sample media.
+          The GitHub Actions-built binaries are useful for CLI validation, WAV I/O guardrails, --dry-run, --check-sdk, and documentation/package structure. Actual NVIDIA AFX processing still requires a local SDK-enabled build until a legal CI SDK setup exists.
 
           To process audio with a local SDK-enabled build, install NVIDIA Audio Effects SDK separately and pass:
 
           - --runtime-root <path to NVIDIA Audio Effects SDK runtime>
           - --model <path to .trtpkg model>
-
-          ### Supported effects in SDK-enabled builds
-
-          - denoiser
-          - dereverb
-          - dereverb_denoiser
-
-          ### Supported sample rates
-
-          - 16000
-          - 48000
-
-          ### FFmpeg pipe support
-
-          - --input - reads WAV from stdin.
-          - --output - writes 32-bit float WAV to stdout.
-          - stdout contains WAV bytes only when --output - is used.
-          - Use PowerShell 7.4+ or cmd.exe for binary WAV pipelines.
-          - Do not use 2>&1 with --output -.
 
           ### MSI installer
 
@@ -246,20 +356,23 @@ jobs:
 
           GitHub Artifact Attestation is included. Authenticode signing is not yet included.
 
-          MSIX is not produced for v$env:RELEASE_VERSION because production MSIX distribution requires trusted package signing.
-          "@ | Set-Content -Encoding utf8 -LiteralPath 'build-release-package\RELEASE_NOTES.md'
+          APT repository signing and publication are not performed by this workflow.
+
+          MSIX is not produced for v$RELEASE_VERSION because production MSIX distribution requires trusted package signing.
+          EOF
 
       - name: Publish GitHub Release
-        shell: pwsh
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create $env:RELEASE_TAG `
-            "build-release-package\$env:PACKAGE_NAME.zip" `
-            "build-release-package\$env:PACKAGE_NAME.msi" `
-            'build-release-package\SHA256SUMS.txt' `
-            --repo $env:GITHUB_REPOSITORY `
-            --title "nvafx-audio-cli v$env:RELEASE_VERSION" `
-            --notes-file 'build-release-package\RELEASE_NOTES.md' `
-            --target $env:GITHUB_SHA `
+          gh release create "$RELEASE_TAG" \
+            "dist/windows-assets/$PACKAGE_NAME.zip" \
+            "dist/windows-assets/$PACKAGE_NAME.msi" \
+            "dist/linux-deb/$LINUX_DEB" \
+            "build-release-package/SHA256SUMS.txt" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "nvafx-audio-cli v$RELEASE_VERSION" \
+            --notes-file 'build-release-package/RELEASE_NOTES.md' \
+            --target "$GITHUB_SHA" \
             --verify-tag

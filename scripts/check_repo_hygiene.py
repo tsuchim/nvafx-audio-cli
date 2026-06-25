@@ -21,6 +21,7 @@ BLOCKED_EXTENSIONS = {
     ".mp3",
     ".dll",
     ".exe",
+    ".deb",
     ".lib",
     ".pdb",
     ".ilk",
@@ -101,4 +102,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

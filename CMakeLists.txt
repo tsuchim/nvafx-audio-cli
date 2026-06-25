@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(nvafx_audio_cli VERSION 0.2.0 LANGUAGES CXX)
+project(nvafx_audio_cli VERSION 0.2.1 LANGUAGES CXX)
 
 option(NVAFX_ENABLE_SDK "Enable NVIDIA Audio Effects SDK integration" OFF)
 set(NVAFX_API_ROOT "" CACHE PATH "Path to the external Maxine AFX SDK API root containing include/ and lib/")
@@ -84,6 +84,21 @@ else()
 endif()
 
 include(CTest)
+include(GNUInstallDirs)
+
+set(CMAKE_INSTALL_DOCDIR "${CMAKE_INSTALL_DATAROOTDIR}/doc/nvafx-audio-cli")
+
+install(TARGETS nvafx-audio-cli
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+
+install(FILES
+    README.md
+    LICENSE
+    THIRD_PARTY_NOTICES.md
+    docs/design.md
+    docs/linux.md
+    docs/release-packaging.md
+    DESTINATION "${CMAKE_INSTALL_DOCDIR}")
 
 if(BUILD_TESTING)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -299,3 +314,26 @@ if(BUILD_TESTING)
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_repo_hygiene.py")
     set_tests_properties(repo-hygiene PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
+
+set(CPACK_PACKAGE_NAME "nvafx-audio-cli")
+set(CPACK_PACKAGE_VENDOR "Eikai Intelligent Systems")
+set(CPACK_PACKAGE_CONTACT "Eikai Intelligent Systems <packages@eikai.co.jp>")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/tsuchim/nvafx-audio-cli")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "SDK-free command-line WAV checks for NVIDIA Audio Effects workflows")
+set(CPACK_PACKAGE_DESCRIPTION
+    "nvafx-audio-cli is an offline command-line tool for NVIDIA Audio Effects SDK WAV processing workflows. This Debian package is SDK-free and includes the CLI public checks, WAV guardrails, dry-run support, and SDK structure checks. Actual NVIDIA SDK-enabled runtime processing still requires external NVIDIA SDK, runtime, and model setup where supported.")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
+endif()
+
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+set(CPACK_DEBIAN_PACKAGE_SECTION "sound")
+set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Eikai Intelligent Systems <packages@eikai.co.jp>")
+set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CPACK_PACKAGE_HOMEPAGE_URL}")
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+
+include(CPack)
