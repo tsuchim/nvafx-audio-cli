@@ -8,7 +8,7 @@ Ubuntu 24.04 packages:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config ffmpeg ca-certificates git python3
+sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config ffmpeg ca-certificates git python3 dpkg-dev file
 ```
 
 The development container persists the same package set in its Dockerfile. NVIDIA drivers, CUDA, and NVIDIA Audio Effects SDK are intentionally not installed by this phase.

@@ -98,7 +98,7 @@ Ubuntu SDK-free build:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config ffmpeg ca-certificates git python3
+sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config ffmpeg ca-certificates git python3 dpkg-dev file
 cmake -S . -B build-linux -G Ninja
 cmake --build build-linux
 ctest --test-dir build-linux --output-on-failure

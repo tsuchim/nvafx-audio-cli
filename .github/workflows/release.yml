@@ -202,7 +202,7 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Install packages
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build ffmpeg dpkg-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build ffmpeg dpkg-dev file
 
       - name: Configure SDK-free Debian package build
         run: cmake -S . -B build-linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
