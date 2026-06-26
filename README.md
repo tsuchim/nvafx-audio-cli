@@ -147,6 +147,19 @@ Linux SDK-enabled local build:
 
 ```bash
 SDK_ROOT=/path/to/Audio_Effects_SDK
+python3 scripts/build_linux_sdk_local.py \
+  --sdk-root "$SDK_ROOT" \
+  --model "$SDK_ROOT/features/denoiser/models/sm_89/denoiser_48k.trtpkg" \
+  --build-dir build-linux-sdk \
+  --install-prefix "$HOME/.local" \
+  --run-test
+```
+
+The helper uses user-provided SDK/runtime/model paths. It does not download, vendor, commit, package, or redistribute NVIDIA SDK files, feature libraries, models, CUDA redistributables, generated media, or sample media. When `--install-prefix` is supplied, it installs only the project-built binary plus a generated local wrapper such as `$HOME/.local/bin/nvafx-audio-cli-sdk`; the wrapper sets process-local `LD_LIBRARY_PATH` entries for the user-provided SDK and then preserves all CLI arguments.
+
+Manual Linux SDK-enabled build:
+
+```bash
 cmake -S . -B build-linux-sdk -G Ninja -DNVAFX_ENABLE_SDK=ON -DNVAFX_RUNTIME_ROOT="$SDK_ROOT"
 cmake --build build-linux-sdk
 ./build-linux-sdk/nvafx-audio-cli --check-sdk --api-root "$SDK_ROOT/nvafx" --runtime-root "$SDK_ROOT"
