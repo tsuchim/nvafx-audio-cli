@@ -8,13 +8,13 @@ Near term, public GitHub Release assets and future public APT packages should re
 
 Do not distribute an SDK-enabled `.deb`, SDK-enabled public binary, NVIDIA SDK file, feature library, model, CUDA redistributable, generated media, or sample media until license review and runtime-path policy are complete.
 
-This keeps the public package safe to publish and install, while still letting users with a valid local NVIDIA SDK setup build and validate real processing.
+This keeps the public package within the project's current artifact boundary by excluding NVIDIA SDK/runtime/model material, while still letting users with a valid local NVIDIA SDK setup build and validate real processing. This project policy is not legal advice or a substitute for license review.
 
 ## Distribution Options
 
 ### 1. SDK-Free Public `.deb` Only
 
-This is the current released Linux package model. It is safe for GitHub Releases and future APT publishing because it contains only project-built files and documentation.
+This is the current released Linux package model. It is the appropriate near-term model for GitHub Releases and future public APT work because it contains only project-built files and documentation and does not bundle NVIDIA SDK/runtime/model material. Normal license, security, packaging, and operational review still applies.
 
 The SDK-free `.deb` does not include NVIDIA runtime libraries, feature libraries, models, CUDA redistributables, generated media, or sample media. It supports CLI checks, WAV guardrails, `--dry-run`, `--check-sdk`, repository hygiene validation, and clear failure when real processing is requested from an SDK-free build. It cannot perform real NVIDIA Audio Effects processing.
 
