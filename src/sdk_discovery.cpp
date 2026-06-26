@@ -59,6 +59,18 @@ bool safe_is_regular_file(const std::filesystem::path& path) {
     return std::filesystem::is_regular_file(path, error) && !error;
 }
 
+bool has_filename(const std::vector<std::string>& paths, const std::string& filename) {
+    return std::any_of(paths.begin(), paths.end(), [&filename](const std::string& path) {
+        return std::filesystem::path(path).filename() == filename;
+    });
+}
+
+bool has_any_filename(const std::vector<std::string>& paths, const std::vector<std::string>& filenames) {
+    return std::any_of(filenames.begin(), filenames.end(), [&paths](const std::string& filename) {
+        return has_filename(paths, filename);
+    });
+}
+
 }  // namespace
 
 std::string resolve_api_root(const std::string& cli_api_root) {
@@ -97,40 +109,79 @@ SdkProbeResult probe_sdk_roots(const std::string& api_root, const std::string& r
     result.api_root_exists = !api_root.empty() && safe_is_directory(api_path);
     result.runtime_root_exists = !runtime_root.empty() && safe_is_directory(runtime_path);
 
-    result.header_found =
-        result.api_root_exists && safe_is_regular_file(api_path / "include" / "nvAudioEffects.h");
+    result.header_found = (result.api_root_exists &&
+                           (safe_is_regular_file(api_path / "include" / "nvAudioEffects.h") ||
+                            safe_is_regular_file(api_path / "nvafx" / "include" / "nvAudioEffects.h"))) ||
+                          (result.runtime_root_exists &&
+                           safe_is_regular_file(runtime_path / "nvafx" / "include" / "nvAudioEffects.h"));
     result.import_library_found =
         result.api_root_exists && safe_is_regular_file(api_path / "lib" / "NVAudioEffects.lib");
+    result.shared_library_found =
+        (result.api_root_exists &&
+         (safe_is_regular_file(api_path / "lib" / "libnv_audiofx.so") ||
+          safe_is_regular_file(api_path / "nvafx" / "lib" / "libnv_audiofx.so"))) ||
+        (result.runtime_root_exists &&
+         safe_is_regular_file(runtime_path / "nvafx" / "lib" / "libnv_audiofx.so"));
     result.runtime_dll_found =
         result.runtime_root_exists && safe_is_regular_file(runtime_path / "NVAudioEffects.dll");
-    result.models_path_found = result.runtime_root_exists && safe_is_directory(runtime_path / "models");
-    result.denoiser_model_found =
-        result.models_path_found &&
-        (safe_is_regular_file(runtime_path / "models" / "denoiser_48k.trtpkg") ||
-         safe_is_regular_file(runtime_path / "models" / "denoiser_16k.trtpkg"));
-    result.dereverb_model_found =
-        result.models_path_found &&
-        (safe_is_regular_file(runtime_path / "models" / "dereverb_48k.trtpkg") ||
-         safe_is_regular_file(runtime_path / "models" / "dereverb_16k.trtpkg"));
-    result.dereverb_denoiser_model_found =
-        result.models_path_found &&
-        (safe_is_regular_file(runtime_path / "models" / "dereverb_denoiser_48k.trtpkg") ||
-         safe_is_regular_file(runtime_path / "models" / "dereverb_denoiser_16k.trtpkg"));
+    result.feature_root_found = result.runtime_root_exists && safe_is_directory(runtime_path / "features");
+    result.denoiser_feature_library_found =
+        result.runtime_root_exists && safe_is_regular_file(runtime_path / "features" / "denoiser" / "lib" /
+                                                           "libnv_audiofx_denoiser.so");
+    result.dereverb_feature_library_found =
+        result.runtime_root_exists && safe_is_regular_file(runtime_path / "features" / "dereverb" / "lib" /
+                                                           "libnv_audiofx_dereverb.so");
+    result.dereverb_denoiser_feature_library_found =
+        result.runtime_root_exists &&
+        safe_is_regular_file(runtime_path / "features" / "dereverb_denoiser" / "lib" /
+                             "libnv_audiofx_dereverb_denoiser.so");
+    result.models_path_found = result.runtime_root_exists &&
+                               (safe_is_directory(runtime_path / "models") ||
+                                safe_is_directory(runtime_path / "features"));
 
     if (result.api_root_exists) {
         collect_files_with_extension(api_path / "lib", ".lib", &result.libraries);
+        collect_files_with_extension(api_path / "lib", ".so", &result.shared_libraries);
+        collect_files_with_extension(api_path / "nvafx" / "lib", ".so", &result.shared_libraries);
     }
     if (result.runtime_root_exists) {
         collect_files_with_extension(runtime_path, ".dll", &result.runtime_dlls);
+        collect_files_with_extension(runtime_path / "nvafx" / "lib", ".so", &result.shared_libraries);
+        collect_files_with_extension(runtime_path / "features", ".so", &result.feature_libraries);
     }
     if (result.models_path_found) {
         collect_files_with_extension(runtime_path / "models", ".trtpkg", &result.models);
+        collect_files_with_extension(runtime_path / "features", ".trtpkg", &result.models);
     }
+
+    std::sort(result.shared_libraries.begin(), result.shared_libraries.end());
+    result.shared_libraries.erase(std::unique(result.shared_libraries.begin(), result.shared_libraries.end()),
+                                  result.shared_libraries.end());
+    std::sort(result.feature_libraries.begin(), result.feature_libraries.end());
+    result.feature_libraries.erase(std::unique(result.feature_libraries.begin(), result.feature_libraries.end()),
+                                   result.feature_libraries.end());
+    std::sort(result.models.begin(), result.models.end());
+    result.models.erase(std::unique(result.models.begin(), result.models.end()), result.models.end());
+
+    result.denoiser_model_found =
+        result.models_path_found &&
+        has_any_filename(result.models, {"denoiser_48k.trtpkg", "denoiser_16k.trtpkg"});
+    result.dereverb_model_found =
+        result.models_path_found &&
+        has_any_filename(result.models, {"dereverb_48k.trtpkg", "dereverb_16k.trtpkg"});
+    result.dereverb_denoiser_model_found =
+        result.models_path_found &&
+        has_any_filename(result.models, {"dereverb_denoiser_48k.trtpkg", "dereverb_denoiser_16k.trtpkg"});
 
     const std::vector<std::pair<std::string, bool>> checks = {
         {"api include/nvAudioEffects.h", result.header_found},
         {"api lib/NVAudioEffects.lib", result.import_library_found},
+        {"linux nvafx/lib/libnv_audiofx.so", result.shared_library_found},
         {"runtime NVAudioEffects.dll", result.runtime_dll_found},
+        {"linux runtime features", result.feature_root_found},
+        {"linux denoiser feature library", result.denoiser_feature_library_found},
+        {"linux dereverb feature library", result.dereverb_feature_library_found},
+        {"linux dereverb_denoiser feature library", result.dereverb_denoiser_feature_library_found},
         {"runtime models", result.models_path_found},
         {"runtime denoiser model", result.denoiser_model_found},
         {"runtime dereverb model", result.dereverb_model_found},
@@ -145,9 +196,12 @@ SdkProbeResult probe_sdk_roots(const std::string& api_root, const std::string& r
         }
     }
 
-    result.structurally_plausible = result.api_root_exists && result.runtime_root_exists &&
-                                    result.header_found && result.import_library_found &&
-                                    result.runtime_dll_found && result.models_path_found;
+    const bool windows_plausible = result.header_found && result.import_library_found &&
+                                   result.runtime_dll_found && result.models_path_found;
+    const bool linux_plausible = result.header_found && result.shared_library_found &&
+                                 result.feature_root_found && result.models_path_found;
+    result.structurally_plausible =
+        result.api_root_exists && result.runtime_root_exists && (windows_plausible || linux_plausible);
 
     return result;
 }

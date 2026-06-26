@@ -12,7 +12,12 @@ struct SdkProbeResult {
     bool runtime_root_exists = false;
     bool header_found = false;
     bool import_library_found = false;
+    bool shared_library_found = false;
     bool runtime_dll_found = false;
+    bool feature_root_found = false;
+    bool denoiser_feature_library_found = false;
+    bool dereverb_feature_library_found = false;
+    bool dereverb_denoiser_feature_library_found = false;
     bool models_path_found = false;
     bool denoiser_model_found = false;
     bool dereverb_model_found = false;
@@ -21,6 +26,8 @@ struct SdkProbeResult {
     std::vector<std::string> present_subpaths;
     std::vector<std::string> missing_subpaths;
     std::vector<std::string> libraries;
+    std::vector<std::string> shared_libraries;
+    std::vector<std::string> feature_libraries;
     std::vector<std::string> runtime_dlls;
     std::vector<std::string> models;
 };

@@ -275,6 +275,20 @@ void print_sdk_probe(const SdkProbeResult& probe) {
         }
     }
 
+    if (!probe.shared_libraries.empty()) {
+        std::cout << "Shared libraries:\n";
+        for (const std::string& library : probe.shared_libraries) {
+            std::cout << "  " << library << "\n";
+        }
+    }
+
+    if (!probe.feature_libraries.empty()) {
+        std::cout << "Feature libraries:\n";
+        for (const std::string& library : probe.feature_libraries) {
+            std::cout << "  " << library << "\n";
+        }
+    }
+
     if (!probe.runtime_dlls.empty()) {
         std::cout << "Runtime DLLs:\n";
         for (const std::string& dll : probe.runtime_dlls) {
