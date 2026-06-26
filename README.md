@@ -167,7 +167,7 @@ cmake --build build-linux-sdk
 
 Linux processing requires the external SDK core library, feature library, real model files, and visible NVIDIA GPU runtime/driver. The SDK-free `.deb` remains installable for checks only and does not perform real NVIDIA processing.
 
-The current distribution policy keeps public release assets and future public APT packages SDK-free. SDK-enabled Linux processing is documented as a local source build workflow using external NVIDIA SDK/model material; see `docs/sdk-enabled-distribution-policy.md`.
+The current distribution policy keeps public release assets and future public APT packages SDK-free. SDK-enabled Linux processing is documented as a local source build workflow using external NVIDIA SDK/model material; see `docs/sdk-enabled-distribution-policy.md`. The planned `v0.3.0` scope keeps that artifact boundary and treats the Linux SDK-enabled workflow as source/docs/helper capability; see `docs/release-v0.3.0-scope.md`.
 
 The main release gate runs on pull requests targeting `main` only. It performs clean Windows and Ubuntu SDK-free builds, CTest guardrails, repository hygiene checks, and CLI public-contract checks without requiring NVIDIA Audio Effects SDK.
 
@@ -176,7 +176,7 @@ See `docs/linux.md` for Ubuntu-specific notes.
 
 ## Release Packaging
 
-`v0.1.0` was the initial manual binary/MSI release. `v0.1.1` is the first GitHub Actions-built and GitHub-attested release. `v0.1.2` added MSI machine `PATH` registration. `v0.1.3` fixes PATH registration correctness so the MSI uses the actual install directory and repair/reinstall do not create duplicates; reopen existing terminals after installing. The `0.2.0` source line adds Ubuntu SDK-free build/test foundation only. The `0.2.1` source line adds Ubuntu/Debian `.deb` packaging for the SDK-free build. The MSI and `.deb` packages do not include NVIDIA SDK/runtime/model files. See `docs/release-packaging.md` for provenance, SDK-free CI binary, MSI, Debian package, and signing notes.
+`v0.1.0` was the initial manual binary/MSI release. `v0.1.1` is the first GitHub Actions-built and GitHub-attested release. `v0.1.2` added MSI machine `PATH` registration. `v0.1.3` fixes PATH registration correctness so the MSI uses the actual install directory and repair/reinstall do not create duplicates; reopen existing terminals after installing. The `0.2.0` source line adds Ubuntu SDK-free build/test foundation only. The `0.2.1` source line adds Ubuntu/Debian `.deb` packaging for the SDK-free build. The planned `0.3.0` source line documents the Linux SDK-enabled local workflow and helper while keeping public artifacts SDK-free. The MSI and `.deb` packages do not include NVIDIA SDK/runtime/model files. See `docs/release-packaging.md` for provenance, SDK-free CI binary, MSI, Debian package, and signing notes.
 ## Current Status
 
 The CLI, SDK discovery checks, WAV I/O, Windows NVIDIA AFX SDK processing path, Linux NVIDIA AFX SDK local processing path, and Ubuntu SDK-free build/test path are implemented. The default build remains SDK-free and fails clearly if processing is requested without SDK support.

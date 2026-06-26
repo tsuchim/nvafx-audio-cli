@@ -10,6 +10,8 @@
 
 The `0.2.0` source line adds Ubuntu SDK-free build/test support. The `0.2.1` source line adds Ubuntu/Debian `.deb` packaging for the SDK-free Linux build.
 
+The planned `0.3.0` source line documents and ships the Linux SDK-enabled local source workflow and helper script while keeping public release artifacts SDK-free. See `docs/release-v0.3.0-scope.md`.
+
 ## Provenance
 
 Release artifacts are built by GitHub Actions from the public repository source and receive GitHub Artifact Attestations.
@@ -61,6 +63,8 @@ sudo apt install ./nvafx-audio-cli_0.2.1_amd64.deb
 The `.deb` package does not include NVIDIA SDK/runtime/model files, CUDA setup, generated media, or sample media. NVIDIA Linux SDK-enabled processing is available only from local source builds configured with external SDK/runtime/model paths.
 
 Near-term distribution policy keeps public GitHub Release assets and future public APT packages SDK-free. SDK-enabled Linux processing is a documented local source build workflow only. See `docs/sdk-enabled-distribution-policy.md`.
+
+The `v0.3.0` release scope should preserve that policy: source/docs/helper support for the local SDK-enabled workflow, no SDK-enabled public Linux binary, and no SDK-enabled public `.deb`. See `docs/release-v0.3.0-scope.md`.
 
 ## MSI and signing
 
