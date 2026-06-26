@@ -154,6 +154,8 @@ cmake --build build-linux-sdk
 
 Linux processing requires the external SDK core library, feature library, real model files, and visible NVIDIA GPU runtime/driver. The SDK-free `.deb` remains installable for checks only and does not perform real NVIDIA processing.
 
+The current distribution policy keeps public release assets and future public APT packages SDK-free. SDK-enabled Linux processing is documented as a local source build workflow using external NVIDIA SDK/model material; see `docs/sdk-enabled-distribution-policy.md`.
+
 The main release gate runs on pull requests targeting `main` only. It performs clean Windows and Ubuntu SDK-free builds, CTest guardrails, repository hygiene checks, and CLI public-contract checks without requiring NVIDIA Audio Effects SDK.
 
 See `docs/linux.md` for Ubuntu-specific notes.

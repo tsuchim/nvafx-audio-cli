@@ -60,6 +60,8 @@ sudo apt install ./nvafx-audio-cli_0.2.1_amd64.deb
 
 The `.deb` package does not include NVIDIA SDK/runtime/model files, CUDA setup, generated media, or sample media. NVIDIA Linux SDK-enabled processing is available only from local source builds configured with external SDK/runtime/model paths.
 
+Near-term distribution policy keeps public GitHub Release assets and future public APT packages SDK-free. SDK-enabled Linux processing is a documented local source build workflow only. See `docs/sdk-enabled-distribution-policy.md`.
+
 ## MSI and signing
 
 The MSI installs only `nvafx-audio-cli` project files. NVIDIA runtime files and models are not included and are not detected during installation.
