@@ -61,7 +61,7 @@ This package is SDK-free. It does not include NVIDIA SDK runtime files, shared l
 
 Public Linux packages should remain SDK-free until SDK-enabled binary/package policy, license review, and runtime path handling are complete. See `docs/sdk-enabled-distribution-policy.md`.
 
-## Linux SDK-Enabled Local Build
+## Linux SDK-Enabled Local Helper
 
 Use an externally extracted NVIDIA Audio Effects SDK. Do not vendor or commit SDK files, feature libraries, models, CUDA redistributables, generated media, or sample media.
 
@@ -76,7 +76,32 @@ Audio_Effects_SDK/
   features/denoiser/models/<arch>/denoiser_48k.trtpkg
 ```
 
-Configure and build:
+The recommended local workflow is the helper script. It validates user-provided SDK/model paths, configures an SDK-enabled build, builds the CLI, runs `--check-sdk`, can run the manual real-processing smoke test, and can install a local wrapper:
+
+```bash
+SDK_ROOT=/path/to/Audio_Effects_SDK
+python3 scripts/build_linux_sdk_local.py \
+  --sdk-root "$SDK_ROOT" \
+  --model "$SDK_ROOT/features/denoiser/models/sm_89/denoiser_48k.trtpkg" \
+  --build-dir build-linux-sdk \
+  --install-prefix "$HOME/.local" \
+  --run-test
+```
+
+The helper does not download SDK files or models, does not use credential material, and does not copy NVIDIA SDK/runtime/model/CUDA files into the repository, build tree, package artifacts, or local install prefix. `--run-test` requires a real model and a visible GPU runtime such as `libcuda.so.1`.
+
+When `--install-prefix` is supplied, the local install layout is:
+
+```text
+<install-prefix>/bin/nvafx-audio-cli-sdk
+<install-prefix>/libexec/nvafx-audio-cli-sdk/nvafx-audio-cli
+```
+
+The generated wrapper is a local artifact and may contain local SDK paths. It sets process-local `LD_LIBRARY_PATH` entries for existing SDK library directories and then executes the installed project-built binary while preserving user arguments. It is not a public package and must not be committed.
+
+## Manual Linux SDK-Enabled Local Build
+
+Configure and build without the helper:
 
 ```bash
 SDK_ROOT=/path/to/Audio_Effects_SDK

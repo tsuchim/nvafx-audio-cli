@@ -375,6 +375,13 @@ if(BUILD_TESTING)
     add_test(NAME repo-hygiene
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_repo_hygiene.py")
     set_tests_properties(repo-hygiene PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+    add_test(NAME helper-linux-sdk-local-ci
+        COMMAND "${CMAKE_COMMAND}"
+            "-DPYTHON_EXECUTABLE=${Python3_EXECUTABLE}"
+            "-DSCRIPT_PATH=${CMAKE_CURRENT_SOURCE_DIR}/scripts/build_linux_sdk_local.py"
+            "-DTEST_DATA_DIR=${TEST_DATA_DIR}"
+            -P "${TEST_HELPERS_DIR}/run_build_linux_sdk_local_tests.cmake")
 endif()
 
 set(CPACK_PACKAGE_NAME "nvafx-audio-cli")

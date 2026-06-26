@@ -60,6 +60,8 @@ Linux SDK-enabled processing works from a local source build when the user provi
 
 The user must pass explicit runtime and model paths when processing audio. Public CI does not download SDK material and does not run SDK-enabled processing.
 
+`scripts/build_linux_sdk_local.py` is the recommended local helper for this workflow. It uses user-provided SDK/runtime/model paths, configures and builds an SDK-enabled local binary, optionally runs a real smoke test when a model and GPU runtime are available, and can generate a local wrapper under a user-selected install prefix. The wrapper is generated locally and may contain local SDK paths, but it installs only project-built files and does not copy NVIDIA SDK, feature, model, or CUDA redistributable files.
+
 ## Artifact Boundary
 
 The repository, release assets, and public packages must not include:
@@ -75,7 +77,7 @@ The repository, release assets, and public packages must not include:
 ## Future Work
 
 - Publish a public APT repository for the SDK-free package only, after APT publishing and signing policy are ready.
-- Add an optional SDK-enabled local build helper that validates user-provided SDK paths without downloading or vendoring SDK material.
+- Maintain the optional SDK-enabled local build helper that validates user-provided SDK paths without downloading or vendoring SDK material.
 - Decide whether an SDK-enabled binary without bundled SDK/model artifacts is supportable, including Linux dynamic loading and `LD_LIBRARY_PATH` expectations.
 - Complete license review before any SDK-enabled binary/package distribution that might include or redistribute NVIDIA artifacts.
 - Clean up or revoke operator-managed NGC credentials after SDK acquisition is no longer needed.
