@@ -30,7 +30,7 @@ python3 scripts/check_repo_hygiene.py
 `./build-linux/nvafx-audio-cli --version` should print:
 
 ```text
-nvafx-audio-cli 0.2.1
+nvafx-audio-cli 0.3.0
 ```
 
 ## SDK-Free Debian Package
@@ -41,7 +41,7 @@ Build the SDK-free `.deb` package:
 cmake -S . -B build-linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
 cmake --build build-linux
 cpack --config build-linux/CPackConfig.cmake -G DEB -B build-linux/package
-python3 scripts/check_deb_package.py build-linux/package/nvafx-audio-cli_0.2.1_amd64.deb
+python3 scripts/check_deb_package.py build-linux/package/nvafx-audio-cli_0.3.0_amd64.deb
 ```
 
 The package installs:
@@ -54,7 +54,7 @@ The package installs:
 After a release provides the `.deb`, install it manually:
 
 ```bash
-sudo apt install ./nvafx-audio-cli_0.2.1_amd64.deb
+sudo apt install ./nvafx-audio-cli_0.3.0_amd64.deb
 ```
 
 This package is SDK-free. It does not include NVIDIA SDK runtime files, shared libraries, models, CUDA setup, generated media, or sample media. It can validate CLI behavior and SDK tree structure, but it cannot perform real NVIDIA processing.
@@ -188,7 +188,7 @@ NGC is used only to acquire SDK features and models. API keys must not be stored
 
 ## APT Publishing
 
-APT repository publishing remains future work. APT signing identity and public key inventory are centrally managed by `local-infra`, but this project does not publish an APT repository and does not use production APT signing in the v0.2.1 package workflow.
+APT repository publishing remains future work. APT signing identity and public key inventory are centrally managed by `local-infra`, but this project does not publish an APT repository and does not use production APT signing in the v0.3.0 package workflow.
 
 ## SDK Artifact Policy
 
