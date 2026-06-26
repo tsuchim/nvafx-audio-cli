@@ -58,6 +58,8 @@ A structurally plausible Linux setup has `nvafx/include/nvAudioEffects.h`, `nvaf
 
 SDK-enabled processing is available for Windows local SDK builds and Linux local SDK builds. Public package and CI workflows remain SDK-free and do not vendor or download NVIDIA SDK material.
 
+The near-term distribution policy is to ship public GitHub Release assets and future public APT packages as SDK-free builds only. SDK-enabled Linux processing remains a local source build workflow with user-provided SDK/runtime/model material until license review and runtime-path policy are complete. See `docs/sdk-enabled-distribution-policy.md`.
+
 
 ## Pipe I/O
 

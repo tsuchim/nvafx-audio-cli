@@ -59,6 +59,8 @@ sudo apt install ./nvafx-audio-cli_0.2.1_amd64.deb
 
 This package is SDK-free. It does not include NVIDIA SDK runtime files, shared libraries, models, CUDA setup, generated media, or sample media. It can validate CLI behavior and SDK tree structure, but it cannot perform real NVIDIA processing.
 
+Public Linux packages should remain SDK-free until SDK-enabled binary/package policy, license review, and runtime path handling are complete. See `docs/sdk-enabled-distribution-policy.md`.
+
 ## Linux SDK-Enabled Local Build
 
 Use an externally extracted NVIDIA Audio Effects SDK. Do not vendor or commit SDK files, feature libraries, models, CUDA redistributables, generated media, or sample media.
@@ -166,3 +168,5 @@ APT repository publishing remains future work. APT signing identity and public k
 ## SDK Artifact Policy
 
 NVIDIA SDK runtime files, shared libraries, DLLs, models, headers, import libraries, generated media, and sample media are not included and must not be committed. SDK/runtime/model paths remain external user-provided inputs for SDK-enabled local builds.
+
+Do not publish SDK-enabled `.deb` packages or public SDK-enabled Linux binaries until the distribution policy is updated after license review.
