@@ -183,6 +183,35 @@ def merged_env_with_library_dirs(library_dirs: list[Path], extra: dict[str, str]
     return env
 
 
+def comparable_library_dir(path_text: str) -> str:
+    path = Path(path_text).expanduser()
+    if path.exists():
+        return str(path.resolve())
+    if path.is_absolute():
+        return str(path)
+    return str((Path.cwd() / path).absolute())
+
+
+def env_without_sdk_library_dirs(library_dirs: list[Path]) -> dict[str, str]:
+    env = os.environ.copy()
+    sdk_dirs = {comparable_library_dir(str(path)) for path in library_dirs}
+    existing = env.get("LD_LIBRARY_PATH")
+    if existing is None:
+        return env
+
+    preserved_entries: list[str] = []
+    for entry in existing.split(":"):
+        if entry and comparable_library_dir(entry) in sdk_dirs:
+            continue
+        preserved_entries.append(entry)
+
+    if preserved_entries:
+        env["LD_LIBRARY_PATH"] = ":".join(preserved_entries)
+    else:
+        env.pop("LD_LIBRARY_PATH", None)
+    return env
+
+
 def run_command(
     command: list[str],
     *,
@@ -275,8 +304,8 @@ def install_local_wrapper(
     installed_binary.chmod(installed_binary.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     make_wrapper(wrapper_path, installed_binary, library_dirs)
 
-    env = merged_env_with_library_dirs(library_dirs)
-    run_command([str(wrapper_path), "--version"], cwd=repo_root(), env=env)
+    wrapper_validation_env = env_without_sdk_library_dirs(library_dirs)
+    run_command([str(wrapper_path), "--version"], cwd=repo_root(), env=wrapper_validation_env)
     run_command(
         [
             str(wrapper_path),
@@ -287,8 +316,9 @@ def install_local_wrapper(
             str(sdk_root),
         ],
         cwd=repo_root(),
-        env=env,
+        env=wrapper_validation_env,
     )
+    print("Installed wrapper validation ran without pre-populated SDK LD_LIBRARY_PATH.")
     return wrapper_path
 
 
@@ -305,12 +335,12 @@ def run_installed_wrapper_processing_smoke(
     require_path(fixture, "Built wav-fixture helper", is_dir=False)
     require_path(inspect, "Built wav-inspect helper", is_dir=False)
 
-    env = merged_env_with_library_dirs(library_dirs)
+    wrapper_validation_env = env_without_sdk_library_dirs(library_dirs)
     with tempfile.TemporaryDirectory(prefix="nvafx-sdk-wrapper-") as temp_dir:
         temp_root = Path(temp_dir)
         input_wav = temp_root / "input.wav"
         output_wav = temp_root / "output.wav"
-        run_command([str(fixture), str(input_wav), "48000", "1", "pcm16"], cwd=repo_root(), env=env)
+        run_command([str(fixture), str(input_wav), "48000", "1", "pcm16"], cwd=repo_root())
         run_command(
             [
                 str(wrapper_path),
@@ -328,9 +358,10 @@ def run_installed_wrapper_processing_smoke(
                 str(sdk_root),
             ],
             cwd=repo_root(),
-            env=env,
+            env=wrapper_validation_env,
         )
-        run_command([str(inspect), str(output_wav), "48000", "1", "4"], cwd=repo_root(), env=env)
+        run_command([str(inspect), str(output_wav), "48000", "1", "4"], cwd=repo_root())
+    print("Installed wrapper processing smoke ran without pre-populated SDK LD_LIBRARY_PATH.")
 
 
 def print_plan(
