@@ -10,6 +10,8 @@ Do not distribute an SDK-enabled `.deb`, SDK-enabled public binary, NVIDIA SDK f
 
 This keeps the public package within the project's current artifact boundary by excluding NVIDIA SDK/runtime/model material, while still letting users with a valid local NVIDIA SDK setup build and validate real processing. This project policy is not legal advice or a substitute for license review.
 
+The planned `v0.3.0` release follows this recommendation as a source/docs/helper release for the Linux SDK-enabled local workflow. See `docs/release-v0.3.0-scope.md`.
+
 ## Distribution Options
 
 ### 1. SDK-Free Public `.deb` Only
