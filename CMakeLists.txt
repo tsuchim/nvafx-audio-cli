@@ -17,6 +17,10 @@ if(NVAFX_ENABLE_SDK)
         set(NVAFX_RUNTIME_ROOT "$ENV{AFX_SDK_ROOT}" CACHE PATH "Path to the installed NVIDIA Audio Effects SDK runtime root" FORCE)
     endif()
 
+    if(NOT NVAFX_API_ROOT AND NVAFX_RUNTIME_ROOT AND EXISTS "${NVAFX_RUNTIME_ROOT}/nvafx/include/nvAudioEffects.h")
+        set(NVAFX_API_ROOT "${NVAFX_RUNTIME_ROOT}/nvafx" CACHE PATH "Path to the external Maxine AFX SDK API root containing include/ and lib/" FORCE)
+    endif()
+
     if(NOT NVAFX_API_ROOT)
         message(FATAL_ERROR "NVAFX_ENABLE_SDK=ON requires NVAFX_API_ROOT or environment variable NVAFX_API_ROOT")
     endif()
@@ -25,20 +29,54 @@ if(NVAFX_ENABLE_SDK)
         message(FATAL_ERROR "NVAFX_ENABLE_SDK=ON requires NVAFX_RUNTIME_ROOT, environment variable NVAFX_RUNTIME_ROOT, or AFX_SDK_ROOT")
     endif()
 
-    set(NVAFX_HEADER "${NVAFX_API_ROOT}/include/nvAudioEffects.h")
-    set(NVAFX_IMPORT_LIB "${NVAFX_API_ROOT}/lib/NVAudioEffects.lib")
-    set(NVAFX_RUNTIME_DLL "${NVAFX_RUNTIME_ROOT}/NVAudioEffects.dll")
+    find_path(NVAFX_INCLUDE_DIR
+        NAMES nvAudioEffects.h
+        HINTS
+            "${NVAFX_API_ROOT}/include"
+            "${NVAFX_API_ROOT}/nvafx/include"
+            "${NVAFX_RUNTIME_ROOT}/nvafx/include"
+        NO_DEFAULT_PATH)
 
-    if(NOT EXISTS "${NVAFX_HEADER}")
-        message(FATAL_ERROR "NVIDIA AFX header not found: ${NVAFX_HEADER}")
+    if(NOT NVAFX_INCLUDE_DIR)
+        message(FATAL_ERROR "NVIDIA AFX header not found under NVAFX_API_ROOT=${NVAFX_API_ROOT} or NVAFX_RUNTIME_ROOT=${NVAFX_RUNTIME_ROOT}")
     endif()
 
-    if(NOT EXISTS "${NVAFX_IMPORT_LIB}")
-        message(FATAL_ERROR "NVIDIA AFX import library not found: ${NVAFX_IMPORT_LIB}")
-    endif()
+    if(WIN32)
+        set(NVAFX_IMPORT_LIB "${NVAFX_API_ROOT}/lib/NVAudioEffects.lib")
+        set(NVAFX_RUNTIME_DLL "${NVAFX_RUNTIME_ROOT}/NVAudioEffects.dll")
 
-    if(NOT EXISTS "${NVAFX_RUNTIME_DLL}")
-        message(FATAL_ERROR "NVIDIA AFX runtime DLL not found: ${NVAFX_RUNTIME_DLL}")
+        if(NOT EXISTS "${NVAFX_IMPORT_LIB}")
+            message(FATAL_ERROR "NVIDIA AFX import library not found: ${NVAFX_IMPORT_LIB}")
+        endif()
+
+        if(NOT EXISTS "${NVAFX_RUNTIME_DLL}")
+            message(FATAL_ERROR "NVIDIA AFX runtime DLL not found: ${NVAFX_RUNTIME_DLL}")
+        endif()
+    else()
+        find_library(NVAFX_SHARED_LIBRARY
+            NAMES nv_audiofx libnv_audiofx.so
+            HINTS
+                "${NVAFX_API_ROOT}/lib"
+                "${NVAFX_API_ROOT}/nvafx/lib"
+                "${NVAFX_RUNTIME_ROOT}/nvafx/lib"
+            NO_DEFAULT_PATH)
+
+        if(NOT NVAFX_SHARED_LIBRARY)
+            message(FATAL_ERROR "NVIDIA AFX shared library libnv_audiofx.so not found under NVAFX_API_ROOT=${NVAFX_API_ROOT} or NVAFX_RUNTIME_ROOT=${NVAFX_RUNTIME_ROOT}")
+        endif()
+
+        get_filename_component(NVAFX_SHARED_LIBRARY_DIR "${NVAFX_SHARED_LIBRARY}" DIRECTORY)
+
+        set(NVAFX_RPATH_DIRS
+            "${NVAFX_SHARED_LIBRARY_DIR}"
+            "${NVAFX_RUNTIME_ROOT}/external/cuda/lib")
+        file(GLOB NVAFX_FEATURE_LIBRARY_DIRS LIST_DIRECTORIES true "${NVAFX_RUNTIME_ROOT}/features/*/lib")
+        foreach(NVAFX_FEATURE_LIBRARY_DIR IN LISTS NVAFX_FEATURE_LIBRARY_DIRS)
+            if(IS_DIRECTORY "${NVAFX_FEATURE_LIBRARY_DIR}")
+                list(APPEND NVAFX_RPATH_DIRS "${NVAFX_FEATURE_LIBRARY_DIR}")
+            endif()
+        endforeach()
+        list(REMOVE_DUPLICATES NVAFX_RPATH_DIRS)
     endif()
 endif()
 
@@ -65,8 +103,16 @@ endif()
 
 if(NVAFX_ENABLE_SDK)
     target_compile_definitions(nvafx-audio-cli PRIVATE NVAFX_WITH_SDK)
-    target_include_directories(nvafx-audio-cli PRIVATE "${NVAFX_API_ROOT}/include")
-    target_link_libraries(nvafx-audio-cli PRIVATE "${NVAFX_IMPORT_LIB}")
+    target_include_directories(nvafx-audio-cli PRIVATE "${NVAFX_INCLUDE_DIR}")
+    if(WIN32)
+        target_link_libraries(nvafx-audio-cli PRIVATE "${NVAFX_IMPORT_LIB}")
+    else()
+        target_link_libraries(nvafx-audio-cli PRIVATE "${NVAFX_SHARED_LIBRARY}" ${CMAKE_DL_LIBS})
+        target_link_options(nvafx-audio-cli PRIVATE -Wl,--disable-new-dtags)
+        set_target_properties(nvafx-audio-cli PROPERTIES
+            BUILD_RPATH "${NVAFX_RPATH_DIRS}"
+            INSTALL_RPATH "")
+    endif()
     if(MSVC)
         target_link_options(nvafx-audio-cli PRIVATE /DELAYLOAD:NVAudioEffects.dll)
         target_link_libraries(nvafx-audio-cli PRIVATE delayimp)
@@ -238,9 +284,11 @@ if(BUILD_TESTING)
         COMMAND "${CLI_EXE}" --input "${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav" --output "${TEST_DATA_DIR}/out.wav" --effect denoiser)
     set_tests_properties(cli-processing-missing-model PROPERTIES FIXTURES_REQUIRED wav_files WILL_FAIL TRUE)
 
-    add_test(NAME cli-sdk-disabled-processing-fails
-        COMMAND "${CLI_EXE}" --input "${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav" --output "${TEST_DATA_DIR}/disabled_out.wav" --effect denoiser --model "${TEST_DATA_DIR}/dummy_model.trtpkg" --runtime-root "${TEST_DATA_DIR}")
-    set_tests_properties(cli-sdk-disabled-processing-fails PROPERTIES FIXTURES_REQUIRED wav_files WILL_FAIL TRUE)
+    if(NOT NVAFX_ENABLE_SDK)
+        add_test(NAME cli-sdk-disabled-processing-fails
+            COMMAND "${CLI_EXE}" --input "${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav" --output "${TEST_DATA_DIR}/disabled_out.wav" --effect denoiser --model "${TEST_DATA_DIR}/dummy_model.trtpkg" --runtime-root "${TEST_DATA_DIR}")
+        set_tests_properties(cli-sdk-disabled-processing-fails PROPERTIES FIXTURES_REQUIRED wav_files WILL_FAIL TRUE)
+    endif()
 
     add_test(NAME cli-help-documents-allow-unsafe-pipe
         COMMAND "${CMAKE_COMMAND}"
@@ -278,17 +326,19 @@ if(BUILD_TESTING)
             -P "${TEST_HELPERS_DIR}/run_invalid_stdin_error.cmake")
     set_tests_properties(cli-invalid-stdin-helpful-error PROPERTIES FIXTURES_REQUIRED wav_files)
 
-    add_test(NAME cli-sdk-disabled-output-stdout-clean
-        COMMAND "${CMAKE_COMMAND}"
-            "-DCLI_EXE=${CLI_EXE}"
-            "-DINPUT_WAV=${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav"
-            "-DMODEL_PATH=${TEST_DATA_DIR}/dummy_model.trtpkg"
-            "-DRUNTIME_ROOT=${TEST_DATA_DIR}"
-            "-DSTDOUT_FILE=${TEST_DATA_DIR}/disabled_pipe_stdout.bin"
-            "-DSTDERR_FILE=${TEST_DATA_DIR}/disabled_pipe_stderr.txt"
-            "-DEXPECTED_TEXT=SDK support is not enabled"
-            -P "${TEST_HELPERS_DIR}/run_sdk_disabled_stdout_clean.cmake")
-    set_tests_properties(cli-sdk-disabled-output-stdout-clean PROPERTIES FIXTURES_REQUIRED wav_files)
+    if(NOT NVAFX_ENABLE_SDK)
+        add_test(NAME cli-sdk-disabled-output-stdout-clean
+            COMMAND "${CMAKE_COMMAND}"
+                "-DCLI_EXE=${CLI_EXE}"
+                "-DINPUT_WAV=${TEST_DATA_DIR}/valid_pcm16_48k_mono.wav"
+                "-DMODEL_PATH=${TEST_DATA_DIR}/dummy_model.trtpkg"
+                "-DRUNTIME_ROOT=${TEST_DATA_DIR}"
+                "-DSTDOUT_FILE=${TEST_DATA_DIR}/disabled_pipe_stdout.bin"
+                "-DSTDERR_FILE=${TEST_DATA_DIR}/disabled_pipe_stderr.txt"
+                "-DEXPECTED_TEXT=SDK support is not enabled"
+                -P "${TEST_HELPERS_DIR}/run_sdk_disabled_stdout_clean.cmake")
+        set_tests_properties(cli-sdk-disabled-output-stdout-clean PROPERTIES FIXTURES_REQUIRED wav_files)
+    endif()
 
     add_test(NAME wav-stream-stdout-roundtrip
         COMMAND "${CMAKE_COMMAND}"
@@ -309,6 +359,18 @@ if(BUILD_TESTING)
             "-DCLI_EXE=${CLI_EXE}"
             "-DTEST_DATA_DIR=${TEST_DATA_DIR}"
             -P "${TEST_HELPERS_DIR}/run_check_sdk_fake_tree.cmake")
+
+    if(UNIX AND NOT APPLE)
+        add_test(NAME manual-linux-sdk-processing
+            COMMAND "${CMAKE_COMMAND}"
+                "-DCLI_EXE=${CLI_EXE}"
+                "-DFIXTURE_EXE=${FIXTURE_EXE}"
+                "-DINSPECT_EXE=${INSPECT_EXE}"
+                "-DTEST_DATA_DIR=${TEST_DATA_DIR}"
+                -P "${TEST_HELPERS_DIR}/run_manual_linux_sdk_processing.cmake")
+        set_tests_properties(manual-linux-sdk-processing PROPERTIES
+            SKIP_REGULAR_EXPRESSION "Skipping manual Linux SDK processing test")
+    endif()
 
     add_test(NAME repo-hygiene
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_repo_hygiene.py")

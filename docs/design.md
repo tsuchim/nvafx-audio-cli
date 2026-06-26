@@ -50,11 +50,13 @@ The default build is SDK-free. SDK processing is enabled only when configured wi
 
 If CMake cache variables are absent, `NVAFX_API_ROOT` and `NVAFX_RUNTIME_ROOT` environment variables are accepted. `AFX_SDK_ROOT` remains a runtime-root compatibility fallback when useful. Local development paths must remain outside committed source and must not be hardcoded.
 
-`--check-sdk` resolves API and runtime roots, checks structure, reports headers, import libraries, runtime DLLs, model area, and detected model files. It does not load SDK DLLs and does not claim processing will succeed.
+`--check-sdk` resolves API and runtime roots, checks structure, reports headers, Windows import libraries, Windows runtime DLLs, Linux shared libraries, Linux feature libraries, model areas, and detected model files. It does not load SDK DLLs or shared libraries and does not claim processing will succeed.
 
 A structurally plausible setup has `include\nvAudioEffects.h`, `lib\NVAudioEffects.lib`, `NVAudioEffects.dll`, and a `models` directory.
 
-In `0.2.0`, SDK-enabled discovery and processing remain Windows-oriented. Ubuntu support is SDK-free only; NVIDIA Linux SDK runtime loading, `.so` handling, CUDA setup, and GPU processing are deferred.
+A structurally plausible Linux setup has `nvafx/include/nvAudioEffects.h`, `nvafx/lib/libnv_audiofx.so`, a `features` directory with feature libraries, and `.trtpkg` models under feature model directories.
+
+SDK-enabled processing is available for Windows local SDK builds and Linux local SDK builds. Public package and CI workflows remain SDK-free and do not vendor or download NVIDIA SDK material.
 
 
 ## Pipe I/O

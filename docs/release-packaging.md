@@ -58,7 +58,7 @@ Manual install after download:
 sudo apt install ./nvafx-audio-cli_0.2.1_amd64.deb
 ```
 
-The `.deb` package does not include NVIDIA SDK/runtime/model files, CUDA setup, generated media, or sample media. NVIDIA Linux SDK-enabled processing remains future work.
+The `.deb` package does not include NVIDIA SDK/runtime/model files, CUDA setup, generated media, or sample media. NVIDIA Linux SDK-enabled processing is available only from local source builds configured with external SDK/runtime/model paths.
 
 ## MSI and signing
 
