@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version without leading v, for example 0.2.1
+        description: Release version without leading v, for example 0.3.0
         required: true
-        default: 0.2.1
+        default: 0.3.0
   push:
     tags:
       - 'v*'
@@ -306,7 +306,7 @@ jobs:
 
           ### Ubuntu/Debian package
 
-          v$RELEASE_VERSION adds an Ubuntu/Debian .deb package for the SDK-free Linux build.
+          v$RELEASE_VERSION documents and ships the Linux SDK-enabled local source/helper workflow while keeping public GitHub Actions-built assets SDK-free.
 
           Manual install after download:
 
@@ -317,7 +317,11 @@ jobs:
           - /usr/bin/nvafx-audio-cli
           - /usr/share/doc/nvafx-audio-cli/
 
-          This package is SDK-free. It does not include NVIDIA SDK files, NVIDIA shared libraries, NVIDIA models, CUDA setup, generated media, or sample media. NVIDIA Linux SDK-enabled processing remains future work.
+          This package is SDK-free. It does not include NVIDIA SDK files, NVIDIA shared libraries, NVIDIA models, CUDA redistributables, generated media, sample media, credentials, or SDK acquisition logs. The Linux .deb cannot perform real NVIDIA processing.
+
+          Real NVIDIA AFX processing requires a local SDK-enabled source build with user-provided NVIDIA SDK/runtime/model material. The source tree includes documentation and the scripts/build_linux_sdk_local.py helper for that local workflow.
+
+          No SDK-enabled public binary or SDK-enabled public .deb is included in this release.
 
           APT repository publishing is not enabled in this release workflow. Production APT signing is managed outside this repository and is not used here.
 
@@ -337,7 +341,7 @@ jobs:
 
           GitHub-hosted runners do not include NVIDIA Audio Effects SDK and this workflow does not vendor, scrape, or download restricted NVIDIA SDK files.
 
-          The GitHub Actions-built binaries are useful for CLI validation, WAV I/O guardrails, --dry-run, --check-sdk, and documentation/package structure. Actual NVIDIA AFX processing still requires a local SDK-enabled build until a legal CI SDK setup exists.
+          The GitHub Actions-built binaries are useful for CLI validation, WAV I/O guardrails, --dry-run, --check-sdk, and documentation/package structure. Actual NVIDIA AFX processing requires a local SDK-enabled build with user-provided SDK/runtime/model material.
 
           To process audio with a local SDK-enabled build, install NVIDIA Audio Effects SDK separately and pass:
 

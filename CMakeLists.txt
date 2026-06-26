@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(nvafx_audio_cli VERSION 0.2.1 LANGUAGES CXX)
+project(nvafx_audio_cli VERSION 0.3.0 LANGUAGES CXX)
 
 option(NVAFX_ENABLE_SDK "Enable NVIDIA Audio Effects SDK integration" OFF)
 set(NVAFX_API_ROOT "" CACHE PATH "Path to the external Maxine AFX SDK API root containing include/ and lib/")

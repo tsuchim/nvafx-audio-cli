@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 EXPECTED_PACKAGE = "nvafx-audio-cli"
-EXPECTED_VERSION = "0.2.1"
+EXPECTED_VERSION = "0.3.0"
 EXPECTED_ARCHITECTURE = "amd64"
 
 REQUIRED_CONTENTS = {

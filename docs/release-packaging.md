@@ -10,7 +10,7 @@
 
 The `0.2.0` source line adds Ubuntu SDK-free build/test support. The `0.2.1` source line adds Ubuntu/Debian `.deb` packaging for the SDK-free Linux build.
 
-The planned `0.3.0` source line documents and ships the Linux SDK-enabled local source workflow and helper script while keeping public release artifacts SDK-free. See `docs/release-v0.3.0-scope.md`.
+The `0.3.0` source line documents and ships the Linux SDK-enabled local source workflow and helper script while keeping public release artifacts SDK-free. See `docs/release-v0.3.0-scope.md`.
 
 ## Provenance
 
@@ -41,10 +41,10 @@ nvafx-audio-cli --input in.wav --output out.wav --effect denoiser --sample-rate 
 
 ## Debian package
 
-Starting with `v0.2.1`, the release workflow is prepared to produce an Ubuntu/Debian `.deb` package for the SDK-free Linux build:
+Starting with `v0.2.1`, the release workflow is prepared to produce Ubuntu/Debian `.deb` packages for the SDK-free Linux build. For `v0.3.0`, the expected package is:
 
 ```text
-nvafx-audio-cli_0.2.1_amd64.deb
+nvafx-audio-cli_0.3.0_amd64.deb
 ```
 
 The package installs:
@@ -57,7 +57,7 @@ The package installs:
 Manual install after download:
 
 ```bash
-sudo apt install ./nvafx-audio-cli_0.2.1_amd64.deb
+sudo apt install ./nvafx-audio-cli_0.3.0_amd64.deb
 ```
 
 The `.deb` package does not include NVIDIA SDK/runtime/model files, CUDA setup, generated media, or sample media. NVIDIA Linux SDK-enabled processing is available only from local source builds configured with external SDK/runtime/model paths.
@@ -80,4 +80,4 @@ GitHub Artifact Attestation is separate from Authenticode signing. Attestation p
 
 APT publishing is future work. APT signing identity and public key inventory are centrally managed by `local-infra`, but production APT repository signing and publication are not enabled in this project workflow.
 
-MSIX is deferred until trusted package signing is available. No MSIX package is produced for `v0.2.1`.
+MSIX is deferred until trusted package signing is available. No MSIX package is produced for `v0.3.0`.
