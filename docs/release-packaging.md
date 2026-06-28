@@ -12,6 +12,8 @@ The `0.2.0` source line adds Ubuntu SDK-free build/test support. The `0.2.1` sou
 
 The `0.3.0` source line documents and ships the Linux SDK-enabled local source workflow and helper script while keeping public release artifacts SDK-free. See `docs/release-v0.3.0-scope.md`.
 
+The `0.3.1` source line keeps public artifacts SDK-free and ships the corrected local SDK-enabled build/install wrapper workflow for real processing with user-provided SDK/runtime/model material. See `docs/release-v0.3.1-scope.md`.
+
 ## Provenance
 
 Release artifacts are built by GitHub Actions from the public repository source and receive GitHub Artifact Attestations.
@@ -41,10 +43,10 @@ nvafx-audio-cli --input in.wav --output out.wav --effect denoiser --sample-rate 
 
 ## Debian package
 
-Starting with `v0.2.1`, the release workflow is prepared to produce Ubuntu/Debian `.deb` packages for the SDK-free Linux build. For `v0.3.0`, the expected package is:
+Starting with `v0.2.1`, the release workflow is prepared to produce Ubuntu/Debian `.deb` packages for the SDK-free Linux build. For `v0.3.1`, the expected package is:
 
 ```text
-nvafx-audio-cli_0.3.0_amd64.deb
+nvafx-audio-cli_0.3.1_amd64.deb
 ```
 
 The package installs:
@@ -57,14 +59,14 @@ The package installs:
 Manual install after download:
 
 ```bash
-sudo apt install ./nvafx-audio-cli_0.3.0_amd64.deb
+sudo apt install ./nvafx-audio-cli_0.3.1_amd64.deb
 ```
 
 The `.deb` package does not include NVIDIA SDK/runtime/model files, feature libraries, CUDA setup, generated media, or sample media, and it cannot perform real NVIDIA AFX processing by itself. NVIDIA Linux SDK-enabled processing is available from the local source build/install helper configured with external SDK/runtime/model paths.
 
 Near-term distribution policy keeps public GitHub Release assets and future public APT packages SDK-free. SDK-enabled Linux processing is a documented local source build workflow only. See `docs/sdk-enabled-distribution-policy.md`.
 
-The `v0.3.0` release scope should preserve that policy: source/docs/helper support for the local SDK-enabled workflow, no SDK-enabled public Linux binary, and no SDK-enabled public `.deb`. See `docs/release-v0.3.0-scope.md`.
+The `v0.3.1` release scope should preserve that policy: SDK-free public artifacts, corrected local SDK-enabled build/install wrapper support for real processing, no SDK-enabled public Linux binary, and no SDK-enabled public `.deb`. See `docs/release-v0.3.1-scope.md`.
 
 ## MSI and signing
 
@@ -80,4 +82,4 @@ GitHub Artifact Attestation is separate from Authenticode signing. Attestation p
 
 APT publishing is future work. APT signing identity and public key inventory are centrally managed by `local-infra`, but production APT repository signing and publication are not enabled in this project workflow.
 
-MSIX is deferred until trusted package signing is available. No MSIX package is produced for `v0.3.0`.
+MSIX is deferred until trusted package signing is available. No MSIX package is produced for `v0.3.1`.

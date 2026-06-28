@@ -10,7 +10,7 @@ Do not distribute an SDK-enabled `.deb`, SDK-enabled public binary, NVIDIA SDK f
 
 This keeps the public package within the project's current artifact boundary by excluding NVIDIA SDK/runtime/model material, while still letting users with a valid local NVIDIA SDK setup install a local processing command. This project policy is not legal advice or a substitute for license review.
 
-The `v0.3.0` release follows this recommendation as a source/docs/helper release for the Linux SDK-enabled local workflow. See `docs/release-v0.3.0-scope.md`.
+The `v0.3.0` release follows this recommendation as a source/docs/helper release for the Linux SDK-enabled local workflow. The `v0.3.1` release keeps the same artifact boundary and ships the corrected local SDK-enabled build/install wrapper workflow. See `docs/release-v0.3.1-scope.md`.
 
 ## Distribution Options
 
@@ -46,7 +46,7 @@ Any internal package that includes selected NVIDIA artifacts, feature libraries,
 
 ## Current Public Package Contract
 
-The public `.deb` package line, including `v0.2.1` and `v0.3.0`, is SDK-free. It is installable and useful for command-line validation, WAV input/output checks, dry runs, SDK tree structure checks, and package smoke tests.
+The public `.deb` package line, including `v0.2.1`, `v0.3.0`, and `v0.3.1`, is SDK-free. It is installable and useful for command-line validation, WAV input/output checks, dry runs, SDK tree structure checks, and package smoke tests.
 
 It does not perform real NVIDIA Audio Effects processing because it does not include or link against the NVIDIA SDK runtime and does not include feature libraries or models.
 
