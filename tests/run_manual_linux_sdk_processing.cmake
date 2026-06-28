@@ -18,6 +18,8 @@ set(api_root "${sdk_root}/nvafx")
 set(work_dir "${TEST_DATA_DIR}/manual-linux-sdk")
 set(input_wav "${work_dir}/input.wav")
 set(output_wav "${work_dir}/output.wav")
+set(stdio_output_wav "${work_dir}/output-stdio.wav")
+set(stdio_stderr "${work_dir}/output-stdio.stderr.txt")
 
 file(MAKE_DIRECTORY "${work_dir}")
 
@@ -29,6 +31,7 @@ endforeach()
 
 execute_process(
     COMMAND "${CLI_EXE}" --check-sdk --api-root "${api_root}" --runtime-root "${sdk_root}"
+        --model "${model_path}"
     RESULT_VARIABLE check_result
 )
 if(NOT check_result EQUAL 0)
@@ -67,4 +70,35 @@ execute_process(
 )
 if(NOT inspect_result EQUAL 0)
     message(FATAL_ERROR "output WAV inspection failed with exit code ${inspect_result}")
+endif()
+
+file(REMOVE "${stdio_output_wav}" "${stdio_stderr}")
+execute_process(
+    COMMAND "${CLI_EXE}"
+        --input -
+        --output -
+        --effect denoiser
+        --sample-rate 48000
+        --model "${model_path}"
+        --runtime-root "${sdk_root}"
+        --allow-unsafe-pipe
+    INPUT_FILE "${input_wav}"
+    OUTPUT_FILE "${stdio_output_wav}"
+    ERROR_FILE "${stdio_stderr}"
+    RESULT_VARIABLE stdio_process_result
+)
+if(NOT stdio_process_result EQUAL 0)
+    message(FATAL_ERROR "SDK stdin/stdout processing failed with exit code ${stdio_process_result}")
+endif()
+
+if(NOT EXISTS "${stdio_output_wav}")
+    message(FATAL_ERROR "SDK stdin/stdout processing did not create output WAV")
+endif()
+
+execute_process(
+    COMMAND "${INSPECT_EXE}" "${stdio_output_wav}" 48000 1 4
+    RESULT_VARIABLE stdio_inspect_result
+)
+if(NOT stdio_inspect_result EQUAL 0)
+    message(FATAL_ERROR "stdio output WAV inspection failed with exit code ${stdio_inspect_result}")
 endif()

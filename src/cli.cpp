@@ -12,6 +12,8 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <system_error>
+#include <vector>
 
 namespace nvafx {
 namespace {
@@ -38,11 +40,13 @@ struct Options {
 void print_help() {
     std::cout
         << "nvafx-audio-cli " << kVersion << "\n"
-        << "Small offline audio processing CLI for NVIDIA Audio Effects SDK.\n\n"
+        << "Offline WAV CLI for NVIDIA Audio Effects SDK workflows.\n"
+        << "SDK processing in this binary: " << (afx_sdk_build_enabled() ? "enabled" : "not enabled")
+        << "\n\n"
         << "Usage:\n"
         << "  nvafx-audio-cli --help\n"
         << "  nvafx-audio-cli --version\n"
-        << "  nvafx-audio-cli --check-sdk [--api-root path] [--runtime-root path]\n"
+        << "  nvafx-audio-cli --check-sdk [--api-root path] [--runtime-root path] [--model path]\n"
         << "  nvafx-audio-cli --input in.wav --output out.wav --effect denoiser "
            "--sample-rate 48000 --intensity 1.0 --model model.trtpkg "
            "[--runtime-root path] [--dry-run]\n"
@@ -63,6 +67,39 @@ void print_help() {
         << "  --dry-run              Validate and print the planned operation without output.\n"
         << "  --check-sdk            Check API/runtime SDK roots and expected files.\n"
         << "  --allow-unsafe-pipe    Override conservative Windows shell pipe refusal.\n\n"
+        << "Processing checklist:\n"
+        << "  1. Tested real processing input is PCM WAV, 48000 Hz, mono, signed 16-bit\n"
+        << "     or float32. Output is a 32-bit float WAV. Other rates/effects require\n"
+        << "     matching model material. Stereo fails clearly when the loaded SDK\n"
+        << "     effect/model is mono-only.\n"
+        << "  2. Real processing requires an SDK-enabled build, --runtime-root, --model,\n"
+        << "     the matching SDK feature library, and visible NVIDIA GPU runtime.\n"
+        << "  3. Public release binaries/packages are SDK-free. They are useful for\n"
+        << "     --help, --version, --dry-run, --check-sdk, and WAV validation, but they\n"
+        << "     cannot run real NVIDIA processing.\n\n"
+        << "Linux SDK-enabled denoiser example:\n"
+        << "  SDK_ROOT=/path/to/Audio_Effects_SDK\n"
+        << "  nvafx-audio-cli --input input-48k-mono.wav --output output.wav \\\n"
+        << "    --effect denoiser --sample-rate 48000 \\\n"
+        << "    --model \"$SDK_ROOT/features/denoiser/models/sm_89/denoiser_48k.trtpkg\" \\\n"
+        << "    --runtime-root \"$SDK_ROOT\"\n\n"
+        << "Linux local SDK build/helper example:\n"
+        << "  python3 scripts/build_linux_sdk_local.py --sdk-root \"$SDK_ROOT\" \\\n"
+        << "    --model \"$SDK_ROOT/features/denoiser/models/sm_89/denoiser_48k.trtpkg\" \\\n"
+        << "    --install-prefix \"$HOME/.local\" --run-test\n"
+        << "  $HOME/.local/bin/nvafx-audio-cli-sdk --input input-48k-mono.wav \\\n"
+        << "    --output output.wav --effect denoiser --sample-rate 48000 \\\n"
+        << "    --model \"$SDK_ROOT/features/denoiser/models/sm_89/denoiser_48k.trtpkg\" \\\n"
+        << "    --runtime-root \"$SDK_ROOT\"\n\n"
+        << "Common failure hints:\n"
+        << "  SDK support is not enabled in this build:\n"
+        << "    You are running an SDK-free binary. Use a local SDK-enabled build or wrapper.\n"
+        << "  model path does not exist:\n"
+        << "    Pass the real .trtpkg model path for the selected effect.\n"
+        << "  Linux feature library not found:\n"
+        << "    --runtime-root must point to Audio_Effects_SDK with features/<effect>/lib/.\n"
+        << "  libcuda.so.1 or GPU errors:\n"
+        << "    Expose NVIDIA GPU runtime to this process before real processing.\n\n"
         << "When --output - is used for processing, stdout contains WAV bytes only. "
            "Diagnostics go to stderr. PowerShell 7.4+ is required for native byte-stream piping; "
            "avoid 2>&1 and PowerShell cmdlets inside binary WAV pipelines.\n";
@@ -179,12 +216,16 @@ bool has_processing_options(const Options& options) {
            options.model;
 }
 
+bool has_processing_command_options(const Options& options) {
+    return options.input || options.output || options.effect || options.sample_rate || options.intensity;
+}
+
 void validate_mode(const Options& options) {
     if (options.check_sdk && options.dry_run) {
         throw std::runtime_error("--check-sdk and --dry-run cannot be used together");
     }
 
-    if (options.check_sdk && has_processing_options(options)) {
+    if (options.check_sdk && has_processing_command_options(options)) {
         throw std::runtime_error("--check-sdk cannot be combined with processing options");
     }
 
@@ -192,6 +233,24 @@ void validate_mode(const Options& options) {
         !options.dry_run && !has_processing_options(options)) {
         throw std::runtime_error("SDK root options require --check-sdk, --dry-run, or processing options");
     }
+}
+
+bool is_regular_file(const std::string& path) {
+    std::error_code error;
+    return std::filesystem::is_regular_file(path, error) && !error;
+}
+
+bool is_directory(const std::string& path) {
+    std::error_code error;
+    return std::filesystem::is_directory(path, error) && !error;
+}
+
+std::string join_requirements(const std::vector<std::string>& requirements) {
+    std::string message = "cannot process audio:";
+    for (const std::string& requirement : requirements) {
+        message += "\n  - " + requirement;
+    }
+    return message;
 }
 
 void require_processing_triplet(const Options& options) {
@@ -316,7 +375,26 @@ int check_sdk(const Options& options) {
 
     const SdkProbeResult probe = probe_sdk_roots(api_root, runtime_root);
     print_sdk_probe(probe);
-    return probe.structurally_plausible ? 0 : 2;
+
+    bool model_ok = true;
+    if (options.model) {
+        model_ok = is_regular_file(*options.model);
+        std::cout << "Model: " << *options.model << "\n";
+        std::cout << "Model file exists: " << (model_ok ? "yes" : "no") << "\n";
+        if (!model_ok) {
+            std::cout << "Missing model requirement: pass --model <path-to-model.trtpkg> for the selected effect.\n";
+        }
+    }
+
+    if (!afx_sdk_build_enabled()) {
+        std::cout << "SDK processing in this binary: not enabled\n";
+        std::cout << "Public release packages are SDK-free and intentionally omit NVIDIA SDK runtime, "
+                     "feature libraries, and models.\n";
+    } else {
+        std::cout << "SDK processing in this binary: enabled\n";
+    }
+
+    return (probe.structurally_plausible && model_ok) ? 0 : 2;
 }
 
 int dry_run(const Options& options) {
@@ -359,23 +437,37 @@ int process(const Options& options) {
     require_processing_triplet(options);
     enforce_pipe_safety(options);
 
-    if (!options.model) {
-        throw std::runtime_error("--model is required for SDK processing");
+    const std::string runtime_root =
+        resolve_runtime_root(options.runtime_root.value_or(""), options.sdk_root.value_or(""));
+
+    std::vector<std::string> missing_requirements;
+    if (!afx_sdk_build_enabled()) {
+        missing_requirements.push_back(
+            "this nvafx-audio-cli binary is SDK-free: real NVIDIA AFX processing is not enabled in this build. "
+            "Public release packages intentionally omit NVIDIA SDK runtime, feature libraries, and models. "
+            "Use a local SDK-enabled build or wrapper for real processing.");
     }
 
-    if (!std::filesystem::is_regular_file(*options.model)) {
-        throw std::runtime_error("model path does not exist: " + *options.model);
+    if (!options.model) {
+        missing_requirements.push_back("--model <path-to-model.trtpkg> is required for SDK processing");
+    } else if (!is_regular_file(*options.model)) {
+        missing_requirements.push_back("model path does not exist: " + *options.model);
+    }
+
+    if (runtime_root.empty()) {
+        missing_requirements.push_back(
+            "--runtime-root <Audio_Effects_SDK>, --sdk-root, NVAFX_RUNTIME_ROOT, or AFX_SDK_ROOT is required for SDK processing");
+    } else if (!is_directory(runtime_root)) {
+        missing_requirements.push_back("runtime root does not exist: " + runtime_root);
+    }
+
+    if (!missing_requirements.empty()) {
+        throw std::runtime_error(join_requirements(missing_requirements));
     }
 
     const AudioBuffer input = read_input_audio(options);
     if (options.sample_rate && static_cast<int>(input.sample_rate) != *options.sample_rate) {
         throw std::runtime_error("--sample-rate does not match input WAV sample rate");
-    }
-
-    const std::string runtime_root =
-        resolve_runtime_root(options.runtime_root.value_or(""), options.sdk_root.value_or(""));
-    if (runtime_root.empty()) {
-        throw std::runtime_error("--runtime-root, --sdk-root, NVAFX_RUNTIME_ROOT, or AFX_SDK_ROOT is required for SDK processing");
     }
 
     const AfxProcessOptions process_options{

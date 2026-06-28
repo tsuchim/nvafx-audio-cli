@@ -1,8 +1,10 @@
 # nvafx-audio-cli
 
-Small offline WAV processing CLI for NVIDIA Audio Effects SDK.
+Offline WAV CLI for NVIDIA Audio Effects SDK workflows.
 
 This project is a small command-line tool that processes WAV files offline through a locally installed NVIDIA Audio Effects SDK. Ubuntu SDK-free build and test support starts in the `0.2.0` source line, Ubuntu/Debian `.deb` packaging starts in the `0.2.1` source line, and Linux SDK-enabled local processing is available from source builds configured with `NVAFX_ENABLE_SDK=ON`.
+
+Public GitHub Release binaries and public `.deb` packages are SDK-free. They are useful for installation checks, `--help`, `--version`, `--dry-run`, WAV validation, stdin/stdout guardrails, and `--check-sdk`, but they cannot perform real NVIDIA AFX processing by themselves. Real processing requires an SDK-enabled local or internal build plus externally supplied NVIDIA Audio Effects SDK runtime, matching feature library, model `.trtpkg`, and visible NVIDIA GPU runtime.
 
 NVIDIA SDK binaries, models, AI features, redistributables, installers, generated audio/video files, and sample media are not included in this repository. The official NVIDIA Maxine AFX SDK API repository is used only as a local build dependency and is not vendored here.
 
@@ -21,6 +23,20 @@ Processing requires an SDK-enabled build, a runtime root, and an explicit model 
 
 ```powershell
 nvafx-audio-cli --input in.wav --output out.wav --effect denoiser --sample-rate 48000 --intensity 1.0 --model C:\Path\To\denoiser_48k.trtpkg --runtime-root C:\Path\To\NVIDIA-Audio-Effects-SDK
+```
+
+Linux stdin/stdout processing is also supported by SDK-enabled builds. Diagnostics go to stderr and stdout contains WAV bytes only:
+
+```bash
+cat in-48k-mono.wav | nvafx-audio-cli \
+  --input - \
+  --output - \
+  --effect denoiser \
+  --sample-rate 48000 \
+  --intensity 1.0 \
+  --model /path/to/denoiser_48k.trtpkg \
+  --runtime-root /path/to/Audio_Effects_SDK \
+  > out.wav
 ```
 
 This project is not sponsored, endorsed, or approved by NVIDIA. NVIDIA, Maxine, RTX, and related names are trademarks of NVIDIA Corporation.
@@ -87,9 +103,10 @@ nvafx-audio-cli --input in.wav --output out.wav --effect denoiser --sample-rate 
 ```
 
 Use `--check-sdk` to inspect a user-provided API root and runtime root:
+It also accepts `--model` to verify the exact model path intended for processing:
 
 ```powershell
-nvafx-audio-cli --check-sdk --api-root C:\Path\To\Maxine-AFX-SDK\nvafx --runtime-root C:\Path\To\NVIDIA-Audio-Effects-SDK
+nvafx-audio-cli --check-sdk --api-root C:\Path\To\Maxine-AFX-SDK\nvafx --runtime-root C:\Path\To\NVIDIA-Audio-Effects-SDK --model C:\Path\To\denoiser_48k.trtpkg
 ```
 
 ## Build
@@ -123,7 +140,7 @@ Once a release provides the `.deb`, install it manually with:
 sudo apt install ./nvafx-audio-cli_0.3.0_amd64.deb
 ```
 
-The `.deb` package is SDK-free. It installs `nvafx-audio-cli` to `/usr/bin` and project documentation to `/usr/share/doc/nvafx-audio-cli/`. It does not include NVIDIA SDK runtime files, shared libraries, models, CUDA setup, generated media, or sample media. APT repository publishing is future work.
+The `.deb` package is SDK-free. It installs `nvafx-audio-cli` to `/usr/bin` and project documentation to `/usr/share/doc/nvafx-audio-cli/`. It does not include NVIDIA SDK runtime files, shared libraries, feature libraries, models, CUDA setup, generated media, or sample media, and it cannot perform real NVIDIA AFX processing by itself. APT repository publishing is future work.
 
 Windows SDK-free build:
 

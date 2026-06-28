@@ -57,7 +57,7 @@ After a release provides the `.deb`, install it manually:
 sudo apt install ./nvafx-audio-cli_0.3.0_amd64.deb
 ```
 
-This package is SDK-free. It does not include NVIDIA SDK runtime files, shared libraries, models, CUDA setup, generated media, or sample media. It can validate CLI behavior and SDK tree structure, but it cannot perform real NVIDIA processing.
+This package is SDK-free. It does not include NVIDIA SDK runtime files, shared libraries, feature libraries, models, CUDA setup, generated media, or sample media. It can validate CLI behavior and SDK tree structure, but it cannot perform real NVIDIA processing by itself. Real processing requires a separate SDK-enabled local or internal build plus externally supplied NVIDIA Audio Effects SDK runtime, matching feature library, model `.trtpkg`, and visible NVIDIA GPU runtime.
 
 Public Linux packages should remain SDK-free until SDK-enabled binary/package policy, license review, and runtime path handling are complete. See `docs/sdk-enabled-distribution-policy.md`.
 
@@ -119,7 +119,8 @@ Check the SDK structure:
 ```bash
 ./build-linux-sdk/nvafx-audio-cli --check-sdk \
   --api-root "$SDK_ROOT/nvafx" \
-  --runtime-root "$SDK_ROOT"
+  --runtime-root "$SDK_ROOT" \
+  --model "$SDK_ROOT/features/denoiser/models/sm_89/denoiser_48k.trtpkg"
 ```
 
 Run a local denoiser model:
@@ -133,6 +134,22 @@ Run a local denoiser model:
   --model "$SDK_ROOT/features/denoiser/models/sm_89/denoiser_48k.trtpkg" \
   --runtime-root "$SDK_ROOT"
 ```
+
+Process the same supported WAV format through stdin/stdout:
+
+```bash
+cat input-48k-mono.wav | ./build-linux-sdk/nvafx-audio-cli \
+  --input - \
+  --output - \
+  --effect denoiser \
+  --sample-rate 48000 \
+  --intensity 1.0 \
+  --model "$SDK_ROOT/features/denoiser/models/sm_89/denoiser_48k.trtpkg" \
+  --runtime-root "$SDK_ROOT" \
+  > output.wav
+```
+
+For the locally tested denoiser material, the supported real-processing input is PCM WAV, 48000 Hz, mono, signed 16-bit or float32. The CLI writes a 32-bit float WAV. Stereo WAV parsing is supported for validation, but real processing fails clearly when the loaded SDK effect/model reports mono-only channels. Other effects or sample rates require matching NVIDIA feature/model material and must be validated separately.
 
 The local build records build-tree `RPATH` entries for the SDK core, bundled CUDA libraries, and feature libraries so the SDK can load `libnv_audiofx_<effect>.so` during local validation. Installed or relocated SDK-enabled binaries may still require an appropriate `LD_LIBRARY_PATH`.
 
@@ -171,7 +188,7 @@ NGC is used only to acquire SDK features and models. API keys must not be stored
 - WAV read/write tests
 - stdin/stdout WAV guardrail tests
 - `--check-sdk` structural checks
-- Clear SDK-disabled failure when processing is requested from an SDK-free build
+- Clear SDK-free failure when processing is requested from an SDK-free build
 - Cross-platform repository hygiene through `scripts/check_repo_hygiene.py`
 - SDK-free Debian package structure validation through `scripts/check_deb_package.py`
 - Clear separation from the local SDK-enabled build path
