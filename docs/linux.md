@@ -76,6 +76,8 @@ Audio_Effects_SDK/
   features/denoiser/models/<arch>/denoiser_48k.trtpkg
 ```
 
+The helper and runtime checks also accept versioned shared libraries such as `libnv_audiofx.so.2.1.0` and `libnv_audiofx_denoiser.so.2.1.0` when the unversioned `.so` symlink is absent. Static `.a` libraries are not used.
+
 The recommended local processing install path is the helper script. It validates user-provided SDK/model paths, configures an SDK-enabled build, builds the CLI, runs `--check-sdk`, can run the manual real-processing smoke test, and can install the local `nvafx-audio-cli` processing wrapper:
 
 ```bash

@@ -113,8 +113,29 @@ def require_path(path: Path, label: str, *, is_dir: bool | None = None) -> None:
         raise HelperError(f"{label} is not a file: {path}")
 
 
-def feature_library_name(feature: str) -> str:
-    return f"libnv_audiofx_{feature}.so"
+def find_shared_library(directory: Path, stem: str, label: str) -> Path:
+    unversioned = directory / f"{stem}.so"
+    if unversioned.is_file():
+        return unversioned
+
+    if not directory.exists():
+        raise HelperError(f"{label} directory does not exist: {directory}")
+    if not directory.is_dir():
+        raise HelperError(f"{label} directory is not a directory: {directory}")
+
+    candidates = sorted(
+        path
+        for path in directory.iterdir()
+        if path.is_file()
+        and path.name.startswith(f"{stem}.so.")
+        and not path.name.endswith(".a")
+    )
+    if candidates:
+        return candidates[0]
+
+    raise HelperError(
+        f"{label} not found: expected {unversioned} or versioned {directory / (stem + '.so.*')}"
+    )
 
 
 def validate_sdk_root(sdk_root: Path, feature: str) -> None:
@@ -124,15 +145,15 @@ def validate_sdk_root(sdk_root: Path, feature: str) -> None:
         "Missing NVIDIA AFX header",
         is_dir=False,
     )
-    require_path(
-        sdk_root / "nvafx" / "lib" / "libnv_audiofx.so",
+    find_shared_library(
+        sdk_root / "nvafx" / "lib",
+        "libnv_audiofx",
         "Missing NVIDIA AFX base shared library",
-        is_dir=False,
     )
-    require_path(
-        sdk_root / "features" / feature / "lib" / feature_library_name(feature),
+    find_shared_library(
+        sdk_root / "features" / feature / "lib",
+        f"libnv_audiofx_{feature}",
         f"Missing NVIDIA AFX feature shared library for feature '{feature}'",
-        is_dir=False,
     )
 
 
