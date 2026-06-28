@@ -20,6 +20,9 @@ endif()
 if(NOT help_output MATCHES "--sdk-root")
     message(FATAL_ERROR "--help output does not document --sdk-root")
 endif()
+if(NOT help_output MATCHES "Default:" OR NOT help_output MATCHES "nvafx-audio-cli")
+    message(FATAL_ERROR "--help output does not document the default processing wrapper name")
+endif()
 
 execute_process(
     COMMAND "${PYTHON_EXECUTABLE}" "${SCRIPT_PATH}" --sdk-root "${helper_work_dir}/missing-sdk" --dry-run
@@ -91,4 +94,30 @@ string(FIND "${script_text_lower}" "ngc" ngc_position)
 string(FIND "${script_text_lower}" "api_key" api_key_position)
 if(NOT ngc_position EQUAL -1 OR NOT api_key_position EQUAL -1)
     message(FATAL_ERROR "helper script must not mention credential-specific SDK acquisition terms")
+endif()
+
+set(versioned_sdk "${helper_work_dir}/versioned-sdk")
+set(versioned_model "${versioned_sdk}/features/denoiser/models/sm_89/denoiser_48k.trtpkg")
+file(MAKE_DIRECTORY
+    "${versioned_sdk}/nvafx/include"
+    "${versioned_sdk}/nvafx/lib"
+    "${versioned_sdk}/features/denoiser/lib"
+    "${versioned_sdk}/features/denoiser/models/sm_89")
+file(WRITE "${versioned_sdk}/nvafx/include/nvAudioEffects.h" "/* fake header for versioned dry-run validation */\n")
+file(WRITE "${versioned_sdk}/nvafx/lib/libnv_audiofx.so.2.1.0" "")
+file(WRITE "${versioned_sdk}/features/denoiser/lib/libnv_audiofx_denoiser.so.2.1.0" "")
+file(WRITE "${versioned_model}" "")
+
+execute_process(
+    COMMAND "${PYTHON_EXECUTABLE}" "${SCRIPT_PATH}"
+        --sdk-root "${versioned_sdk}"
+        --model "${versioned_model}"
+        --build-dir "${helper_work_dir}/versioned-dry-build"
+        --dry-run
+    RESULT_VARIABLE versioned_result
+    OUTPUT_VARIABLE versioned_output
+    ERROR_VARIABLE versioned_error
+)
+if(NOT versioned_result EQUAL 0)
+    message(FATAL_ERROR "versioned .so SDK dry-run failed with exit code ${versioned_result}: ${versioned_output}${versioned_error}")
 endif()

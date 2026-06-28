@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -173,6 +174,38 @@ std::string feature_directory_name(const std::string& effect) {
     throw sdk_error("unsupported effect: " + effect);
 }
 
+std::filesystem::path find_linux_shared_library(const std::filesystem::path& directory,
+                                                const std::string& stem) {
+    const std::filesystem::path unversioned = directory / (stem + ".so");
+    std::error_code error;
+    if (std::filesystem::is_regular_file(unversioned, error) && !error) {
+        return unversioned;
+    }
+
+    error.clear();
+    if (!std::filesystem::is_directory(directory, error) || error) {
+        return unversioned;
+    }
+
+    std::vector<std::filesystem::path> candidates;
+    try {
+        for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+            const std::filesystem::path path = entry.path();
+            const std::string filename = path.filename().string();
+            std::error_code entry_error;
+            if (entry.is_regular_file(entry_error) && !entry_error &&
+                filename.rfind(stem + ".so.", 0) == 0) {
+                candidates.push_back(path);
+            }
+        }
+    } catch (const std::filesystem::filesystem_error&) {
+        return unversioned;
+    }
+
+    std::sort(candidates.begin(), candidates.end());
+    return candidates.empty() ? unversioned : candidates.front();
+}
+
 SharedLibrary load_linux_feature_library(const std::string& runtime_root, const std::string& effect) {
     if (runtime_root.empty()) {
         throw sdk_error("runtime root is not set");
@@ -183,14 +216,15 @@ SharedLibrary load_linux_feature_library(const std::string& runtime_root, const 
         throw sdk_error("runtime root does not exist: " + runtime_root);
     }
 
-    const std::filesystem::path base_library = root / "nvafx" / "lib" / "libnv_audiofx.so";
+    const std::filesystem::path base_library =
+        find_linux_shared_library(root / "nvafx" / "lib", "libnv_audiofx");
     if (!std::filesystem::is_regular_file(base_library)) {
         throw sdk_error("Linux runtime library not found: " + base_library.string());
     }
 
     const std::string feature = feature_directory_name(effect);
-    const std::filesystem::path feature_library =
-        root / "features" / feature / "lib" / ("libnv_audiofx_" + feature + ".so");
+    const std::filesystem::path feature_library = find_linux_shared_library(
+        root / "features" / feature / "lib", "libnv_audiofx_" + feature);
     if (!std::filesystem::is_regular_file(feature_library)) {
         throw sdk_error("Linux feature library not found: " + feature_library.string());
     }

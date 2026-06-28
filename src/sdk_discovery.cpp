@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <memory>
+#include <system_error>
 
 namespace nvafx {
 namespace {
@@ -57,6 +58,58 @@ bool safe_is_directory(const std::filesystem::path& path) {
 bool safe_is_regular_file(const std::filesystem::path& path) {
     std::error_code error;
     return std::filesystem::is_regular_file(path, error) && !error;
+}
+
+bool has_linux_shared_library(const std::filesystem::path& directory, const std::string& stem) {
+    if (safe_is_regular_file(directory / (stem + ".so"))) {
+        return true;
+    }
+
+    std::error_code error;
+    if (!std::filesystem::is_directory(directory, error) || error) {
+        return false;
+    }
+
+    try {
+        for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+            std::error_code entry_error;
+            const std::string filename = entry.path().filename().string();
+            if (entry.is_regular_file(entry_error) && !entry_error &&
+                filename.rfind(stem + ".so.", 0) == 0) {
+                return true;
+            }
+        }
+    } catch (const std::filesystem::filesystem_error&) {
+        return false;
+    }
+
+    return false;
+}
+
+void collect_linux_shared_libraries(const std::filesystem::path& root,
+                                    std::vector<std::string>* output) {
+    std::error_code error;
+    if (!std::filesystem::is_directory(root, error) || error) {
+        return;
+    }
+
+    std::vector<std::string> found;
+    try {
+        const auto options = std::filesystem::directory_options::skip_permission_denied;
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(root, options)) {
+            std::error_code entry_error;
+            const std::string filename = entry.path().filename().string();
+            if (entry.is_regular_file(entry_error) && !entry_error &&
+                (entry.path().extension() == ".so" || filename.find(".so.") != std::string::npos)) {
+                found.push_back(entry.path().string());
+            }
+        }
+    } catch (const std::filesystem::filesystem_error&) {
+        // SDK probing is structural and best-effort; unreadable subtrees are skipped.
+    }
+
+    std::sort(found.begin(), found.end());
+    output->insert(output->end(), found.begin(), found.end());
 }
 
 bool has_filename(const std::vector<std::string>& paths, const std::string& filename) {
@@ -118,36 +171,38 @@ SdkProbeResult probe_sdk_roots(const std::string& api_root, const std::string& r
         result.api_root_exists && safe_is_regular_file(api_path / "lib" / "NVAudioEffects.lib");
     result.shared_library_found =
         (result.api_root_exists &&
-         (safe_is_regular_file(api_path / "lib" / "libnv_audiofx.so") ||
-          safe_is_regular_file(api_path / "nvafx" / "lib" / "libnv_audiofx.so"))) ||
+         (has_linux_shared_library(api_path / "lib", "libnv_audiofx") ||
+          has_linux_shared_library(api_path / "nvafx" / "lib", "libnv_audiofx"))) ||
         (result.runtime_root_exists &&
-         safe_is_regular_file(runtime_path / "nvafx" / "lib" / "libnv_audiofx.so"));
+         has_linux_shared_library(runtime_path / "nvafx" / "lib", "libnv_audiofx"));
     result.runtime_dll_found =
         result.runtime_root_exists && safe_is_regular_file(runtime_path / "NVAudioEffects.dll");
     result.feature_root_found = result.runtime_root_exists && safe_is_directory(runtime_path / "features");
     result.denoiser_feature_library_found =
-        result.runtime_root_exists && safe_is_regular_file(runtime_path / "features" / "denoiser" / "lib" /
-                                                           "libnv_audiofx_denoiser.so");
+        result.runtime_root_exists &&
+        has_linux_shared_library(runtime_path / "features" / "denoiser" / "lib",
+                                 "libnv_audiofx_denoiser");
     result.dereverb_feature_library_found =
-        result.runtime_root_exists && safe_is_regular_file(runtime_path / "features" / "dereverb" / "lib" /
-                                                           "libnv_audiofx_dereverb.so");
+        result.runtime_root_exists &&
+        has_linux_shared_library(runtime_path / "features" / "dereverb" / "lib",
+                                 "libnv_audiofx_dereverb");
     result.dereverb_denoiser_feature_library_found =
         result.runtime_root_exists &&
-        safe_is_regular_file(runtime_path / "features" / "dereverb_denoiser" / "lib" /
-                             "libnv_audiofx_dereverb_denoiser.so");
+        has_linux_shared_library(runtime_path / "features" / "dereverb_denoiser" / "lib",
+                                 "libnv_audiofx_dereverb_denoiser");
     result.models_path_found = result.runtime_root_exists &&
                                (safe_is_directory(runtime_path / "models") ||
                                 safe_is_directory(runtime_path / "features"));
 
     if (result.api_root_exists) {
         collect_files_with_extension(api_path / "lib", ".lib", &result.libraries);
-        collect_files_with_extension(api_path / "lib", ".so", &result.shared_libraries);
-        collect_files_with_extension(api_path / "nvafx" / "lib", ".so", &result.shared_libraries);
+        collect_linux_shared_libraries(api_path / "lib", &result.shared_libraries);
+        collect_linux_shared_libraries(api_path / "nvafx" / "lib", &result.shared_libraries);
     }
     if (result.runtime_root_exists) {
         collect_files_with_extension(runtime_path, ".dll", &result.runtime_dlls);
-        collect_files_with_extension(runtime_path / "nvafx" / "lib", ".so", &result.shared_libraries);
-        collect_files_with_extension(runtime_path / "features", ".so", &result.feature_libraries);
+        collect_linux_shared_libraries(runtime_path / "nvafx" / "lib", &result.shared_libraries);
+        collect_linux_shared_libraries(runtime_path / "features", &result.feature_libraries);
     }
     if (result.models_path_found) {
         collect_files_with_extension(runtime_path / "models", ".trtpkg", &result.models);
@@ -165,7 +220,9 @@ SdkProbeResult probe_sdk_roots(const std::string& api_root, const std::string& r
 
     result.denoiser_model_found =
         result.models_path_found &&
-        has_any_filename(result.models, {"denoiser_48k.trtpkg", "denoiser_16k.trtpkg"});
+        has_any_filename(result.models,
+                         {"denoiser_48k.trtpkg", "denoiser_16k.trtpkg",
+                          "denoiser_48k_6656.trtpkg", "denoiser_v2_48k_4480.trtpkg"});
     result.dereverb_model_found =
         result.models_path_found &&
         has_any_filename(result.models, {"dereverb_48k.trtpkg", "dereverb_16k.trtpkg"});

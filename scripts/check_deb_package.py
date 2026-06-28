@@ -101,6 +101,15 @@ def main(argv: list[str]) -> int:
     description = control.get("Description", "")
     if "SDK-free" not in description:
         violations.append("Description must state that the package is SDK-free")
+    for required_phrase in [
+        "cannot perform real NVIDIA Audio Effects processing by itself",
+        "scripts/build_linux_sdk_local.py --install-prefix",
+        "externally supplied NVIDIA Audio Effects SDK",
+        "model .trtpkg",
+        "Public packages intentionally omit NVIDIA SDK/runtime/model/CUDA material",
+    ]:
+        if required_phrase not in description:
+            violations.append(f"Description must contain: {required_phrase!r}")
 
     listing = run_dpkg_deb("--contents", str(deb_path))
     contents = {path for line in listing.splitlines() if (path := normalize_content_path(line))}

@@ -60,6 +60,17 @@ if(NVAFX_ENABLE_SDK)
                 "${NVAFX_API_ROOT}/nvafx/lib"
                 "${NVAFX_RUNTIME_ROOT}/nvafx/lib"
             NO_DEFAULT_PATH)
+        if(NOT NVAFX_SHARED_LIBRARY)
+            file(GLOB NVAFX_SHARED_LIBRARY_CANDIDATES
+                "${NVAFX_API_ROOT}/lib/libnv_audiofx.so*"
+                "${NVAFX_API_ROOT}/nvafx/lib/libnv_audiofx.so*"
+                "${NVAFX_RUNTIME_ROOT}/nvafx/lib/libnv_audiofx.so*")
+            list(SORT NVAFX_SHARED_LIBRARY_CANDIDATES)
+            list(FILTER NVAFX_SHARED_LIBRARY_CANDIDATES EXCLUDE REGEX "\\.a$")
+            if(NVAFX_SHARED_LIBRARY_CANDIDATES)
+                list(GET NVAFX_SHARED_LIBRARY_CANDIDATES 0 NVAFX_SHARED_LIBRARY)
+            endif()
+        endif()
 
         if(NOT NVAFX_SHARED_LIBRARY)
             message(FATAL_ERROR "NVIDIA AFX shared library libnv_audiofx.so not found under NVAFX_API_ROOT=${NVAFX_API_ROOT} or NVAFX_RUNTIME_ROOT=${NVAFX_RUNTIME_ROOT}")
@@ -296,6 +307,24 @@ if(BUILD_TESTING)
             "-DMATCH_TEXT=--allow-unsafe-pipe"
             -P "${TEST_HELPERS_DIR}/assert_help_contains.cmake")
 
+    add_test(NAME cli-help-documents-sdk-build-status
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCLI_EXE=${CLI_EXE}"
+            "-DMATCH_TEXT=SDK processing in this binary:"
+            -P "${TEST_HELPERS_DIR}/assert_help_contains.cmake")
+
+    add_test(NAME cli-help-documents-local-sdk-helper
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCLI_EXE=${CLI_EXE}"
+            "-DMATCH_TEXT=scripts/build_linux_sdk_local.py"
+            -P "${TEST_HELPERS_DIR}/assert_help_contains.cmake")
+
+    add_test(NAME cli-help-documents-sdk-free-boundary
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCLI_EXE=${CLI_EXE}"
+            "-DMATCH_TEXT=Public release binaries/packages are SDK-free"
+            -P "${TEST_HELPERS_DIR}/assert_help_contains.cmake")
+
     add_test(NAME cli-stdin-dry-run-valid
         COMMAND "${CMAKE_COMMAND}"
             "-DCLI_EXE=${CLI_EXE}"
@@ -335,7 +364,7 @@ if(BUILD_TESTING)
                 "-DRUNTIME_ROOT=${TEST_DATA_DIR}"
                 "-DSTDOUT_FILE=${TEST_DATA_DIR}/disabled_pipe_stdout.bin"
                 "-DSTDERR_FILE=${TEST_DATA_DIR}/disabled_pipe_stderr.txt"
-                "-DEXPECTED_TEXT=SDK support is not enabled"
+                "-DEXPECTED_TEXT=SDK-free"
                 -P "${TEST_HELPERS_DIR}/run_sdk_disabled_stdout_clean.cmake")
         set_tests_properties(cli-sdk-disabled-output-stdout-clean PROPERTIES FIXTURES_REQUIRED wav_files)
     endif()
@@ -388,9 +417,9 @@ set(CPACK_PACKAGE_NAME "nvafx-audio-cli")
 set(CPACK_PACKAGE_VENDOR "Eikai Intelligent Systems")
 set(CPACK_PACKAGE_CONTACT "Eikai Intelligent Systems <packages@eikai.co.jp>")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/tsuchim/nvafx-audio-cli")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "SDK-free command-line WAV checks for NVIDIA Audio Effects workflows")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "SDK-free CLI checks for NVIDIA Audio Effects WAV workflows")
 set(CPACK_PACKAGE_DESCRIPTION
-    "nvafx-audio-cli is an offline command-line tool for NVIDIA Audio Effects SDK WAV processing workflows. This Debian package is SDK-free and includes the CLI public checks, WAV guardrails, dry-run support, and SDK structure checks. Actual NVIDIA SDK-enabled runtime processing still requires external NVIDIA SDK, runtime, and model setup where supported.")
+    "This public Debian package is SDK-free and cannot perform real NVIDIA Audio Effects processing by itself. It installs nvafx-audio-cli for help/version, dry-run WAV validation, stdin/stdout guardrails, SDK structure checks, and direct actionable refusal when processing is requested from an SDK-free build. Real processing requires a separate SDK-enabled local or internal build/install path such as scripts/build_linux_sdk_local.py --install-prefix, plus externally supplied NVIDIA Audio Effects SDK runtime, matching feature library, model .trtpkg file, and visible NVIDIA GPU runtime. Public packages intentionally omit NVIDIA SDK/runtime/model/CUDA material.")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 
