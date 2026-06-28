@@ -87,13 +87,15 @@ void print_help() {
         << "  python3 scripts/build_linux_sdk_local.py --sdk-root \"$SDK_ROOT\" \\\n"
         << "    --model \"$SDK_ROOT/features/denoiser/models/sm_89/denoiser_48k.trtpkg\" \\\n"
         << "    --install-prefix \"$HOME/.local\" --run-test\n"
-        << "  $HOME/.local/bin/nvafx-audio-cli-sdk --input input-48k-mono.wav \\\n"
+        << "  $HOME/.local/bin/nvafx-audio-cli --input input-48k-mono.wav \\\n"
         << "    --output output.wav --effect denoiser --sample-rate 48000 \\\n"
         << "    --model \"$SDK_ROOT/features/denoiser/models/sm_89/denoiser_48k.trtpkg\" \\\n"
         << "    --runtime-root \"$SDK_ROOT\"\n\n"
         << "Common failure hints:\n"
         << "  SDK support is not enabled in this build:\n"
-        << "    You are running an SDK-free binary. Use a local SDK-enabled build or wrapper.\n"
+        << "    You are running an SDK-free binary. Install a local SDK-enabled wrapper\n"
+        << "    with scripts/build_linux_sdk_local.py --install-prefix, or run another\n"
+        << "    SDK-enabled build.\n"
         << "  model path does not exist:\n"
         << "    Pass the real .trtpkg model path for the selected effect.\n"
         << "  Linux feature library not found:\n"
@@ -445,7 +447,8 @@ int process(const Options& options) {
         missing_requirements.push_back(
             "this nvafx-audio-cli binary is SDK-free: real NVIDIA AFX processing is not enabled in this build. "
             "Public release packages intentionally omit NVIDIA SDK runtime, feature libraries, and models. "
-            "Use a local SDK-enabled build or wrapper for real processing.");
+            "Use scripts/build_linux_sdk_local.py --install-prefix to install a local SDK-enabled nvafx-audio-cli "
+            "processing wrapper, or run another SDK-enabled build.");
     }
 
     if (!options.model) {

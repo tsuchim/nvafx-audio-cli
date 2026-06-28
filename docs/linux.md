@@ -57,7 +57,7 @@ After a release provides the `.deb`, install it manually:
 sudo apt install ./nvafx-audio-cli_0.3.0_amd64.deb
 ```
 
-This package is SDK-free. It does not include NVIDIA SDK runtime files, shared libraries, feature libraries, models, CUDA setup, generated media, or sample media. It can validate CLI behavior and SDK tree structure, but it cannot perform real NVIDIA processing by itself. Real processing requires a separate SDK-enabled local or internal build plus externally supplied NVIDIA Audio Effects SDK runtime, matching feature library, model `.trtpkg`, and visible NVIDIA GPU runtime.
+This package is SDK-free. It does not include NVIDIA SDK runtime files, shared libraries, feature libraries, models, CUDA setup, generated media, or sample media. It can validate CLI behavior and SDK tree structure, but it cannot perform real NVIDIA processing by itself. Real processing requires the local SDK-enabled build/install helper or another SDK-enabled local/internal build plus externally supplied NVIDIA Audio Effects SDK runtime, matching feature library, model `.trtpkg`, and visible NVIDIA GPU runtime.
 
 Public Linux packages should remain SDK-free until SDK-enabled binary/package policy, license review, and runtime path handling are complete. See `docs/sdk-enabled-distribution-policy.md`.
 
@@ -76,7 +76,7 @@ Audio_Effects_SDK/
   features/denoiser/models/<arch>/denoiser_48k.trtpkg
 ```
 
-The recommended local workflow is the helper script. It validates user-provided SDK/model paths, configures an SDK-enabled build, builds the CLI, runs `--check-sdk`, can run the manual real-processing smoke test, and can install a local wrapper:
+The recommended local processing install path is the helper script. It validates user-provided SDK/model paths, configures an SDK-enabled build, builds the CLI, runs `--check-sdk`, can run the manual real-processing smoke test, and can install the local `nvafx-audio-cli` processing wrapper:
 
 ```bash
 SDK_ROOT=/path/to/Audio_Effects_SDK
@@ -93,11 +93,38 @@ The helper does not download SDK files or models, does not use credential materi
 When `--install-prefix` is supplied, the local install layout is:
 
 ```text
-<install-prefix>/bin/nvafx-audio-cli-sdk
-<install-prefix>/libexec/nvafx-audio-cli-sdk/nvafx-audio-cli
+<install-prefix>/bin/nvafx-audio-cli
+<install-prefix>/libexec/nvafx-audio-cli/nvafx-audio-cli
 ```
 
-The generated wrapper is a local artifact and may contain local SDK paths. It sets process-local `LD_LIBRARY_PATH` entries for existing SDK library directories and then executes the installed project-built binary while preserving user arguments. It is not a public package and must not be committed.
+The generated wrapper is the intended local processing command. It is a local artifact and may contain local SDK paths. It sets process-local `LD_LIBRARY_PATH` entries for existing SDK library directories and then executes the installed project-built binary while preserving user arguments. It is not a public package and must not be committed. If you need a side-by-side command name, pass `--wrapper-name nvafx-audio-cli-sdk`.
+
+If `<install-prefix>/bin` is first on `PATH`, the required processing command is:
+
+```bash
+nvafx-audio-cli \
+  --input input-48k-mono.wav \
+  --output output.wav \
+  --effect denoiser \
+  --sample-rate 48000 \
+  --intensity 1.0 \
+  --model "$SDK_ROOT/features/denoiser/models/sm_89/denoiser_48k.trtpkg" \
+  --runtime-root "$SDK_ROOT"
+```
+
+The same installed wrapper supports stdin/stdout. On success, stdout contains WAV bytes only:
+
+```bash
+cat input-48k-mono.wav | nvafx-audio-cli \
+  --input - \
+  --output - \
+  --effect denoiser \
+  --sample-rate 48000 \
+  --intensity 1.0 \
+  --model "$SDK_ROOT/features/denoiser/models/sm_89/denoiser_48k.trtpkg" \
+  --runtime-root "$SDK_ROOT" \
+  > output.wav
+```
 
 ## Manual Linux SDK-Enabled Local Build
 

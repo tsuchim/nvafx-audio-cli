@@ -419,7 +419,7 @@ set(CPACK_PACKAGE_CONTACT "Eikai Intelligent Systems <packages@eikai.co.jp>")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/tsuchim/nvafx-audio-cli")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "SDK-free CLI checks for NVIDIA Audio Effects WAV workflows")
 set(CPACK_PACKAGE_DESCRIPTION
-    "This public Debian package is SDK-free and cannot perform real NVIDIA Audio Effects processing by itself. It installs nvafx-audio-cli for help/version, dry-run WAV validation, stdin/stdout guardrails, SDK structure checks, and direct actionable refusal when processing is requested from an SDK-free build. Real processing requires a separate SDK-enabled local or internal build plus externally supplied NVIDIA Audio Effects SDK runtime, matching feature library, model .trtpkg file, and visible NVIDIA GPU runtime. Public packages intentionally omit NVIDIA SDK/runtime/model/CUDA material.")
+    "This public Debian package is SDK-free and cannot perform real NVIDIA Audio Effects processing by itself. It installs nvafx-audio-cli for help/version, dry-run WAV validation, stdin/stdout guardrails, SDK structure checks, and direct actionable refusal when processing is requested from an SDK-free build. Real processing requires a separate SDK-enabled local or internal build/install path such as scripts/build_linux_sdk_local.py --install-prefix, plus externally supplied NVIDIA Audio Effects SDK runtime, matching feature library, model .trtpkg file, and visible NVIDIA GPU runtime. Public packages intentionally omit NVIDIA SDK/runtime/model/CUDA material.")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 

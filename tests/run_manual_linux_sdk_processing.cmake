@@ -63,6 +63,10 @@ endif()
 if(NOT EXISTS "${output_wav}")
     message(FATAL_ERROR "SDK processing did not create output WAV")
 endif()
+file(SIZE "${output_wav}" output_wav_size)
+if(output_wav_size EQUAL 0)
+    message(FATAL_ERROR "SDK processing created an empty output WAV")
+endif()
 
 execute_process(
     COMMAND "${INSPECT_EXE}" "${output_wav}" 48000 1 4
@@ -93,6 +97,14 @@ endif()
 
 if(NOT EXISTS "${stdio_output_wav}")
     message(FATAL_ERROR "SDK stdin/stdout processing did not create output WAV")
+endif()
+file(SIZE "${stdio_output_wav}" stdio_output_wav_size)
+if(stdio_output_wav_size EQUAL 0)
+    message(FATAL_ERROR "SDK stdin/stdout processing created an empty output WAV")
+endif()
+file(SIZE "${stdio_stderr}" stdio_stderr_size)
+if(NOT stdio_stderr_size EQUAL 0)
+    message(FATAL_ERROR "SDK stdin/stdout processing wrote ${stdio_stderr_size} byte(s) to stderr")
 endif()
 
 execute_process(

@@ -20,6 +20,9 @@ endif()
 if(NOT help_output MATCHES "--sdk-root")
     message(FATAL_ERROR "--help output does not document --sdk-root")
 endif()
+if(NOT help_output MATCHES "Default:" OR NOT help_output MATCHES "nvafx-audio-cli")
+    message(FATAL_ERROR "--help output does not document the default processing wrapper name")
+endif()
 
 execute_process(
     COMMAND "${PYTHON_EXECUTABLE}" "${SCRIPT_PATH}" --sdk-root "${helper_work_dir}/missing-sdk" --dry-run

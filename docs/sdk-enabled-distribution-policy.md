@@ -4,11 +4,11 @@ This policy describes how `nvafx-audio-cli` should distribute public binaries an
 
 ## Recommendation
 
-Near term, public GitHub Release assets and future public APT packages should remain SDK-free. SDK-enabled Linux processing should be documented as a local source build workflow that uses user-provided NVIDIA Audio Effects SDK core files, feature libraries, model files, and GPU runtime.
+Near term, public GitHub Release assets and future public APT packages should remain SDK-free validation packages. Real SDK-enabled Linux processing is supported through a local source build/install workflow that uses user-provided NVIDIA Audio Effects SDK core files, feature libraries, model files, and GPU runtime.
 
 Do not distribute an SDK-enabled `.deb`, SDK-enabled public binary, NVIDIA SDK file, feature library, model, CUDA redistributable, generated media, or sample media until license review and runtime-path policy are complete.
 
-This keeps the public package within the project's current artifact boundary by excluding NVIDIA SDK/runtime/model material, while still letting users with a valid local NVIDIA SDK setup build and validate real processing. This project policy is not legal advice or a substitute for license review.
+This keeps the public package within the project's current artifact boundary by excluding NVIDIA SDK/runtime/model material, while still letting users with a valid local NVIDIA SDK setup install a local processing command. This project policy is not legal advice or a substitute for license review.
 
 The `v0.3.0` release follows this recommendation as a source/docs/helper release for the Linux SDK-enabled local workflow. See `docs/release-v0.3.0-scope.md`.
 
@@ -24,7 +24,7 @@ The SDK-free `.deb` does not include NVIDIA runtime libraries, feature libraries
 
 Users obtain NVIDIA SDK and model material separately, then build locally with `NVAFX_ENABLE_SDK=ON`. This is the strongest artifact and license boundary because the repository and public release assets do not carry NVIDIA material.
 
-This workflow is less convenient than installing a package, but it is the right near-term path for real processing. It also keeps public CI SDK-free and avoids storing NGC credentials or downloaded SDK material in GitHub-hosted infrastructure.
+This workflow is the near-term path for real processing. It also keeps public CI SDK-free and avoids storing NGC credentials or downloaded SDK material in GitHub-hosted infrastructure.
 
 ### 3. SDK-Enabled Binary Without SDK/Model
 
@@ -62,7 +62,7 @@ Linux SDK-enabled processing works from a local source build when the user provi
 
 The user must pass explicit runtime and model paths when processing audio. Public CI does not download SDK material and does not run SDK-enabled processing.
 
-`scripts/build_linux_sdk_local.py` is the recommended local helper for this workflow. It uses user-provided SDK/runtime/model paths, configures and builds an SDK-enabled local binary, optionally runs a real smoke test when a model and GPU runtime are available, and can generate a local wrapper under a user-selected install prefix. The wrapper is generated locally and may contain local SDK paths, but it installs only project-built files and does not copy NVIDIA SDK, feature, model, or CUDA redistributable files.
+`scripts/build_linux_sdk_local.py` is the recommended local helper for this workflow. It uses user-provided SDK/runtime/model paths, configures and builds an SDK-enabled local binary, optionally runs a real smoke test when a model and GPU runtime are available, and can generate a local wrapper under a user-selected install prefix. By default the wrapper is `<install-prefix>/bin/nvafx-audio-cli`, so it is the command users run for real local processing when that prefix is on `PATH`. The wrapper is generated locally and may contain local SDK paths, but it installs only project-built files and does not copy NVIDIA SDK, feature, model, or CUDA redistributable files.
 
 ## Artifact Boundary
 
@@ -79,7 +79,7 @@ The repository, release assets, and public packages must not include:
 ## Future Work
 
 - Publish a public APT repository for the SDK-free package only, after APT publishing and signing policy are ready.
-- Maintain the optional SDK-enabled local build helper that validates user-provided SDK paths without downloading or vendoring SDK material.
+- Maintain the SDK-enabled local build/install helper that validates user-provided SDK paths without downloading or vendoring SDK material.
 - Decide whether an SDK-enabled binary without bundled SDK/model artifacts is supportable, including Linux dynamic loading and `LD_LIBRARY_PATH` expectations.
 - Complete license review before any SDK-enabled binary/package distribution that might include or redistribute NVIDIA artifacts.
 - Clean up or revoke operator-managed NGC credentials after SDK acquisition is no longer needed.

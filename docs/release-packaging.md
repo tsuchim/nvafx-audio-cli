@@ -29,7 +29,7 @@ gh attestation verify nvafx-audio-cli-v0.1.3-windows-x64.msi -R tsuchim/nvafx-au
 
 The release workflow intentionally does not vendor NVIDIA SDK files, NVIDIA DLLs, NVIDIA models, headers, import libraries, installers, redistributables, generated media, or sample media.
 
-GitHub-hosted runners do not include NVIDIA Audio Effects SDK. Until a legal CI SDK setup exists, GitHub Actions-built binaries are SDK-free. They are useful for CLI validation, WAV I/O guardrails, `--dry-run`, `--check-sdk`, and package structure verification, but they cannot perform real NVIDIA AFX processing by themselves. Actual NVIDIA AFX processing still requires a local SDK-enabled build.
+GitHub-hosted runners do not include NVIDIA Audio Effects SDK. Until a CI SDK setup exists, GitHub Actions-built binaries are SDK-free validation packages. They are useful for CLI validation, WAV I/O guardrails, `--dry-run`, `--check-sdk`, and package structure verification, but they cannot perform real NVIDIA AFX processing by themselves. Actual NVIDIA AFX processing uses the local SDK-enabled build/install helper or another SDK-enabled local/internal build.
 
 Ubuntu CI validates SDK-free configure, build, CTest, hygiene, help, version output, and `.deb` package structure. It does not install NVIDIA drivers, CUDA, NVIDIA Audio Effects SDK, models, headers, import libraries, shared libraries, generated media, or sample media.
 
@@ -60,7 +60,7 @@ Manual install after download:
 sudo apt install ./nvafx-audio-cli_0.3.0_amd64.deb
 ```
 
-The `.deb` package does not include NVIDIA SDK/runtime/model files, feature libraries, CUDA setup, generated media, or sample media, and it cannot perform real NVIDIA AFX processing by itself. NVIDIA Linux SDK-enabled processing is available only from local source builds configured with external SDK/runtime/model paths.
+The `.deb` package does not include NVIDIA SDK/runtime/model files, feature libraries, CUDA setup, generated media, or sample media, and it cannot perform real NVIDIA AFX processing by itself. NVIDIA Linux SDK-enabled processing is available from the local source build/install helper configured with external SDK/runtime/model paths.
 
 Near-term distribution policy keeps public GitHub Release assets and future public APT packages SDK-free. SDK-enabled Linux processing is a documented local source build workflow only. See `docs/sdk-enabled-distribution-policy.md`.
 

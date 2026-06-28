@@ -18,7 +18,7 @@ DEFAULT_BUILD_DIR = "build-linux-sdk"
 DEFAULT_BUILD_TYPE = "RelWithDebInfo"
 DEFAULT_GENERATOR = "Ninja"
 DEFAULT_FEATURE = "denoiser"
-DEFAULT_WRAPPER_NAME = "nvafx-audio-cli-sdk"
+DEFAULT_WRAPPER_NAME = "nvafx-audio-cli"
 
 
 class HelperError(RuntimeError):
@@ -72,12 +72,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--install-prefix",
         type=Path,
-        help="Optional local install prefix for a generated SDK-enabled wrapper.",
+        help=(
+            "Optional local install prefix for the generated SDK-enabled processing command. "
+            "Installs project-built files only."
+        ),
     )
     parser.add_argument(
         "--wrapper-name",
         default=DEFAULT_WRAPPER_NAME,
-        help=f"Wrapper name under <install-prefix>/bin. Default: {DEFAULT_WRAPPER_NAME}",
+        help=(
+            f"Wrapper name under <install-prefix>/bin. Default: {DEFAULT_WRAPPER_NAME}. "
+            "Use a different name for side-by-side installs."
+        ),
     )
     parser.add_argument(
         "--dry-run",
@@ -225,6 +231,35 @@ def run_command(
     return subprocess.run(command, cwd=cwd, env=env, check=True, text=True)
 
 
+def run_command_with_files(
+    command: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str] | None = None,
+    stdin_path: Path | None = None,
+    stdout_path: Path | None = None,
+    stderr_path: Path | None = None,
+) -> None:
+    print(f"+ {command_to_text(command)}", flush=True)
+    stdin_handle = stdin_path.open("rb") if stdin_path else None
+    stdout_handle = stdout_path.open("wb") if stdout_path else None
+    stderr_handle = stderr_path.open("wb") if stderr_path else None
+    try:
+        subprocess.run(
+            command,
+            cwd=cwd,
+            env=env,
+            stdin=stdin_handle,
+            stdout=stdout_handle,
+            stderr=stderr_handle,
+            check=True,
+        )
+    finally:
+        for handle in (stdin_handle, stdout_handle, stderr_handle):
+            if handle is not None:
+                handle.close()
+
+
 def run_capture(command: list[str], *, cwd: Path, env: dict[str, str] | None = None) -> str:
     print(f"+ {command_to_text(command)}", flush=True)
     result = subprocess.run(
@@ -280,6 +315,7 @@ def install_local_wrapper(
     wrapper_name: str,
     library_dirs: list[Path],
     sdk_root: Path,
+    model: Path | None,
     dry_run: bool,
 ) -> Path:
     source_binary = binary_path(build_dir)
@@ -306,18 +342,17 @@ def install_local_wrapper(
 
     wrapper_validation_env = env_without_sdk_library_dirs(library_dirs)
     run_command([str(wrapper_path), "--version"], cwd=repo_root(), env=wrapper_validation_env)
-    run_command(
-        [
-            str(wrapper_path),
-            "--check-sdk",
-            "--api-root",
-            str(sdk_root / "nvafx"),
-            "--runtime-root",
-            str(sdk_root),
-        ],
-        cwd=repo_root(),
-        env=wrapper_validation_env,
-    )
+    check_command = [
+        str(wrapper_path),
+        "--check-sdk",
+        "--api-root",
+        str(sdk_root / "nvafx"),
+        "--runtime-root",
+        str(sdk_root),
+    ]
+    if model is not None:
+        check_command.extend(["--model", str(model)])
+    run_command(check_command, cwd=repo_root(), env=wrapper_validation_env)
     print("Installed wrapper validation ran without pre-populated SDK LD_LIBRARY_PATH.")
     return wrapper_path
 
@@ -340,6 +375,8 @@ def run_installed_wrapper_processing_smoke(
         temp_root = Path(temp_dir)
         input_wav = temp_root / "input.wav"
         output_wav = temp_root / "output.wav"
+        stdio_output_wav = temp_root / "output-stdio.wav"
+        stdio_stderr = temp_root / "output-stdio.stderr.txt"
         run_command([str(fixture), str(input_wav), "48000", "1", "pcm16"], cwd=repo_root())
         run_command(
             [
@@ -360,7 +397,40 @@ def run_installed_wrapper_processing_smoke(
             cwd=repo_root(),
             env=wrapper_validation_env,
         )
+        if output_wav.stat().st_size == 0:
+            raise HelperError("installed wrapper file-to-file processing produced an empty WAV")
         run_command([str(inspect), str(output_wav), "48000", "1", "4"], cwd=repo_root())
+        run_command_with_files(
+            [
+                str(wrapper_path),
+                "--input",
+                "-",
+                "--output",
+                "-",
+                "--effect",
+                "denoiser",
+                "--sample-rate",
+                "48000",
+                "--model",
+                str(model),
+                "--runtime-root",
+                str(sdk_root),
+                "--allow-unsafe-pipe",
+            ],
+            cwd=repo_root(),
+            env=wrapper_validation_env,
+            stdin_path=input_wav,
+            stdout_path=stdio_output_wav,
+            stderr_path=stdio_stderr,
+        )
+        if stdio_output_wav.stat().st_size == 0:
+            raise HelperError("installed wrapper stdin/stdout processing produced an empty WAV")
+        if stdio_stderr.stat().st_size != 0:
+            raise HelperError(
+                "installed wrapper stdin/stdout processing wrote diagnostics to stderr; "
+                "stdout-pipe processing must stay quiet on success"
+            )
+        run_command([str(inspect), str(stdio_output_wav), "48000", "1", "4"], cwd=repo_root())
     print("Installed wrapper processing smoke ran without pre-populated SDK LD_LIBRARY_PATH.")
 
 
@@ -490,6 +560,7 @@ def main() -> int:
                 wrapper_name=args.wrapper_name,
                 library_dirs=library_dirs,
                 sdk_root=sdk_root,
+                model=model,
                 dry_run=args.dry_run,
             )
 

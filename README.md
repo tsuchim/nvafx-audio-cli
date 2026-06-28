@@ -4,7 +4,7 @@ Offline WAV CLI for NVIDIA Audio Effects SDK workflows.
 
 This project is a small command-line tool that processes WAV files offline through a locally installed NVIDIA Audio Effects SDK. Ubuntu SDK-free build and test support starts in the `0.2.0` source line, Ubuntu/Debian `.deb` packaging starts in the `0.2.1` source line, and Linux SDK-enabled local processing is available from source builds configured with `NVAFX_ENABLE_SDK=ON`.
 
-Public GitHub Release binaries and public `.deb` packages are SDK-free. They are useful for installation checks, `--help`, `--version`, `--dry-run`, WAV validation, stdin/stdout guardrails, and `--check-sdk`, but they cannot perform real NVIDIA AFX processing by themselves. Real processing requires an SDK-enabled local or internal build plus externally supplied NVIDIA Audio Effects SDK runtime, matching feature library, model `.trtpkg`, and visible NVIDIA GPU runtime.
+Public GitHub Release binaries and public `.deb` packages are SDK-free validation packages. They are useful for installation checks, `--help`, `--version`, `--dry-run`, WAV validation, stdin/stdout guardrails, and `--check-sdk`, but they cannot perform real NVIDIA AFX processing by themselves. The intended Linux processing install path is a local SDK-enabled build/install with `scripts/build_linux_sdk_local.py --install-prefix`, which installs a generated `nvafx-audio-cli` wrapper that uses externally supplied NVIDIA Audio Effects SDK runtime, matching feature library, model `.trtpkg`, and visible NVIDIA GPU runtime.
 
 NVIDIA SDK binaries, models, AI features, redistributables, installers, generated audio/video files, and sample media are not included in this repository. The official NVIDIA Maxine AFX SDK API repository is used only as a local build dependency and is not vendored here.
 
@@ -140,7 +140,7 @@ Once a release provides the `.deb`, install it manually with:
 sudo apt install ./nvafx-audio-cli_0.3.0_amd64.deb
 ```
 
-The `.deb` package is SDK-free. It installs `nvafx-audio-cli` to `/usr/bin` and project documentation to `/usr/share/doc/nvafx-audio-cli/`. It does not include NVIDIA SDK runtime files, shared libraries, feature libraries, models, CUDA setup, generated media, or sample media, and it cannot perform real NVIDIA AFX processing by itself. APT repository publishing is future work.
+The `.deb` package is SDK-free. It installs `nvafx-audio-cli` to `/usr/bin` and project documentation to `/usr/share/doc/nvafx-audio-cli/`. It does not include NVIDIA SDK runtime files, shared libraries, feature libraries, models, CUDA setup, generated media, or sample media, and it cannot perform real NVIDIA AFX processing by itself. For real Linux processing, use the local SDK-enabled build/install helper below. APT repository publishing is future work.
 
 Windows SDK-free build:
 
@@ -172,7 +172,20 @@ python3 scripts/build_linux_sdk_local.py \
   --run-test
 ```
 
-The helper uses user-provided SDK/runtime/model paths. It does not download, vendor, commit, package, or redistribute NVIDIA SDK files, feature libraries, models, CUDA redistributables, generated media, or sample media. When `--install-prefix` is supplied, it installs only the project-built binary plus a generated local wrapper such as `$HOME/.local/bin/nvafx-audio-cli-sdk`; the wrapper sets process-local `LD_LIBRARY_PATH` entries for the user-provided SDK and then preserves all CLI arguments.
+The helper uses user-provided SDK/runtime/model paths. It does not download, vendor, commit, package, or redistribute NVIDIA SDK files, feature libraries, models, CUDA redistributables, generated media, or sample media. When `--install-prefix` is supplied, it installs only the project-built binary plus a generated local wrapper at `$HOME/.local/bin/nvafx-audio-cli` by default; the wrapper sets process-local `LD_LIBRARY_PATH` entries for the user-provided SDK and then preserves all CLI arguments. Use `--wrapper-name nvafx-audio-cli-sdk` if you intentionally want a side-by-side command name.
+
+After local install, put the selected prefix first on `PATH` or call the wrapper by absolute path:
+
+```bash
+$HOME/.local/bin/nvafx-audio-cli \
+  --input input-48k-mono.wav \
+  --output output.wav \
+  --effect denoiser \
+  --sample-rate 48000 \
+  --intensity 1.0 \
+  --model "$SDK_ROOT/features/denoiser/models/sm_89/denoiser_48k.trtpkg" \
+  --runtime-root "$SDK_ROOT"
+```
 
 Manual Linux SDK-enabled build:
 
@@ -182,7 +195,7 @@ cmake --build build-linux-sdk
 ./build-linux-sdk/nvafx-audio-cli --check-sdk --api-root "$SDK_ROOT/nvafx" --runtime-root "$SDK_ROOT"
 ```
 
-Linux processing requires the external SDK core library, feature library, real model files, and visible NVIDIA GPU runtime/driver. The SDK-free `.deb` remains installable for checks only and does not perform real NVIDIA processing.
+Linux processing requires the external SDK core library, feature library, real model files, and visible NVIDIA GPU runtime/driver. The SDK-free `.deb` remains installable for checks only and does not perform real NVIDIA processing; the local SDK-enabled wrapper is the processing command.
 
 The current distribution policy keeps public release assets and future public APT packages SDK-free. SDK-enabled Linux processing is documented as a local source build workflow using external NVIDIA SDK/model material; see `docs/sdk-enabled-distribution-policy.md`. The `v0.3.0` scope keeps that artifact boundary and treats the Linux SDK-enabled workflow as source/docs/helper capability; see `docs/release-v0.3.0-scope.md`.
 

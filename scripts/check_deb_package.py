@@ -103,6 +103,7 @@ def main(argv: list[str]) -> int:
         violations.append("Description must state that the package is SDK-free")
     for required_phrase in [
         "cannot perform real NVIDIA Audio Effects processing by itself",
+        "scripts/build_linux_sdk_local.py --install-prefix",
         "externally supplied NVIDIA Audio Effects SDK",
         "model .trtpkg",
         "Public packages intentionally omit NVIDIA SDK/runtime/model/CUDA material",
