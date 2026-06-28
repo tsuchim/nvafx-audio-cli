@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version without leading v, for example 0.3.0
+        description: Release version without leading v, for example 0.3.1
         required: true
-        default: 0.3.0
+        default: 0.3.1
   push:
     tags:
       - 'v*'
@@ -115,10 +115,13 @@ jobs:
           NVIDIA headers included: no
 
           Important:
-          This GitHub Actions-built binary is SDK-free. It supports CLI validation, WAV I/O guardrails, --dry-run, and --check-sdk, but actual NVIDIA AFX processing requires a local SDK-enabled build until a legal CI SDK setup exists.
+          This GitHub Actions-built binary is SDK-free. It supports CLI validation, WAV I/O guardrails, --dry-run, and --check-sdk, but actual NVIDIA AFX processing requires a local SDK-enabled build/install with user-provided SDK/runtime/model material.
 
           Required external runtime for SDK-enabled local processing:
           NVIDIA Audio Effects SDK installed locally by the user.
+
+          Recommended local processing install path:
+          scripts/build_linux_sdk_local.py --install-prefix <local prefix>
 
           Required runtime arguments for SDK-enabled processing:
           --runtime-root <path to NVIDIA Audio Effects SDK runtime>
@@ -306,7 +309,7 @@ jobs:
 
           ### Ubuntu/Debian package
 
-          v$RELEASE_VERSION documents and ships the Linux SDK-enabled local source/helper workflow while keeping public GitHub Actions-built assets SDK-free.
+          v$RELEASE_VERSION keeps public GitHub Actions-built assets SDK-free and ships the corrected Linux SDK-enabled local build/install helper workflow.
 
           Manual install after download:
 
@@ -317,9 +320,9 @@ jobs:
           - /usr/bin/nvafx-audio-cli
           - /usr/share/doc/nvafx-audio-cli/
 
-          This package is SDK-free. It does not include NVIDIA SDK files, NVIDIA shared libraries, NVIDIA models, CUDA redistributables, generated media, sample media, credentials, or SDK acquisition logs. The Linux .deb cannot perform real NVIDIA processing.
+          This package is an SDK-free validation package. It does not include NVIDIA SDK files, NVIDIA shared libraries, NVIDIA models, CUDA redistributables, generated media, sample media, credentials, or SDK acquisition logs. The Linux .deb cannot perform real NVIDIA processing by itself.
 
-          Real NVIDIA AFX processing requires a local SDK-enabled source build with user-provided NVIDIA SDK/runtime/model material. The source tree includes documentation and the scripts/build_linux_sdk_local.py helper for that local workflow.
+          Real NVIDIA AFX processing uses a local SDK-enabled build/install with user-provided NVIDIA SDK/runtime/model material. The source tree includes documentation and the scripts/build_linux_sdk_local.py helper. With --install-prefix, the helper installs a generated local nvafx-audio-cli wrapper that sets process-local SDK library paths and runs the project-built SDK-enabled binary.
 
           No SDK-enabled public binary or SDK-enabled public .deb is included in this release.
 
@@ -341,9 +344,13 @@ jobs:
 
           GitHub-hosted runners do not include NVIDIA Audio Effects SDK and this workflow does not vendor, scrape, or download restricted NVIDIA SDK files.
 
-          The GitHub Actions-built binaries are useful for CLI validation, WAV I/O guardrails, --dry-run, --check-sdk, and documentation/package structure. Actual NVIDIA AFX processing requires a local SDK-enabled build with user-provided SDK/runtime/model material.
+          The GitHub Actions-built binaries are useful for CLI validation, WAV I/O guardrails, --dry-run, --check-sdk, and documentation/package structure. Actual NVIDIA AFX processing requires a local SDK-enabled build/install with user-provided SDK/runtime/model material.
 
-          To process audio with a local SDK-enabled build, install NVIDIA Audio Effects SDK separately and pass:
+          To process audio, install NVIDIA Audio Effects SDK separately, run:
+
+              python3 scripts/build_linux_sdk_local.py --sdk-root <path to Audio_Effects_SDK> --model <path to .trtpkg model> --install-prefix <local prefix> --run-test
+
+          Then run the generated local wrapper with:
 
           - --runtime-root <path to NVIDIA Audio Effects SDK runtime>
           - --model <path to .trtpkg model>
