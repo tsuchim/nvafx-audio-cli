@@ -8,6 +8,12 @@ Public GitHub Release binaries and public `.deb` packages are SDK-free validatio
 
 NVIDIA SDK binaries, models, AI features, redistributables, installers, generated audio/video files, and sample media are not included in this repository. The official NVIDIA Maxine AFX SDK API repository is used only as a local build dependency and is not vendored here.
 
+Linux install paths are intentionally separate:
+
+1. Public GitHub Release assets are SDK-free validation packages only. They are not real NVIDIA processing installs.
+2. External Linux real processing requires existing access to the NVIDIA NGC Linux Audio Effects SDK collection. If NGC shows "Subscribe to get access" or redirects to "Contact an NVIDIA AI Enterprise Sales Representative", the external technical install cannot proceed. The sales/contact page is an access/commercial gate outside the technical guide, not an SDK download step. Continue only after the NGC Artifacts tab is visible for your account; see `docs/linux.md`.
+3. Internal APT is a separate package-chain path where `apt install nvafx-audio-cli` either configures a working SDK-enabled command or fails package configuration; see `docs/internal-apt-packaging.md`.
+
 Supported effects:
 
 - `denoiser`

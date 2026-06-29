@@ -61,6 +61,143 @@ This package is SDK-free. It does not include NVIDIA SDK runtime files, shared l
 
 Public Linux packages should remain SDK-free until SDK-enabled binary/package policy, license review, and runtime path handling are complete. See `docs/sdk-enabled-distribution-policy.md`.
 
+## External Linux SDK-Enabled Install
+
+This path is for real Linux NVIDIA denoiser processing with an SDK-enabled local build/install wrapper. It is not the public GitHub Release `.deb`.
+
+### Prerequisite: NGC Access
+
+You must already have access to the NVIDIA NGC Linux Audio Effects SDK collection.
+
+Official entry point:
+
+```text
+NVIDIA AI for Media
+-> Audio Effects
+-> View on NGC (Linux)
+-> Linux Audio Effects SDK collection
+```
+
+NGC collection URL:
+
+```text
+https://catalog.ngc.nvidia.com/orgs/nvidia/maxine/collections/maxine_linux_audio_effects_sdk_collection/-?_lr=1
+```
+
+If the page shows "Subscribe to get access" or redirects to "Contact an NVIDIA AI Enterprise Sales Representative", you do not currently have SDK download access.
+
+That sales/contact page is not the SDK download request and is outside this technical installation procedure.
+
+```text
+Stop here. Continue only after the Artifacts tab is visible for your NVIDIA
+account.
+```
+
+### With Access Granted
+
+Continue only after the Artifacts tab is visible for your account.
+
+1. Download the SDK base package from the Artifacts tab.
+2. Extract the SDK under `/opt/nvidia`.
+3. Make the final canonical path:
+
+   ```text
+   /opt/nvidia/Audio_Effects_SDK
+   ```
+
+4. Verify SDK contents:
+
+   ```bash
+   test -d /opt/nvidia/Audio_Effects_SDK
+   test -f /opt/nvidia/Audio_Effects_SDK/nvafx/include/nvAudioEffects.h
+   find /opt/nvidia/Audio_Effects_SDK -name 'libnv_audiofx.so*'
+   find /opt/nvidia/Audio_Effects_SDK -name 'libnv_audiofx_denoiser.so*'
+   ```
+
+5. Download models for the targeted GPU using either the download script inside the SDK or the NGC UI. Do not invent artifact filenames or model package filenames; use the filenames visible after access is granted.
+6. Locate the 48 kHz denoiser model:
+
+   ```bash
+   find /opt/nvidia/Audio_Effects_SDK -name 'denoiser_48k.trtpkg' -o -name 'denoiser_48k_*.trtpkg'
+   ```
+
+7. Set the model path:
+
+   ```bash
+   MODEL="$(find /opt/nvidia/Audio_Effects_SDK -name 'denoiser_48k.trtpkg' | head -n 1)"
+   echo "$MODEL"
+   test -n "$MODEL"
+   ```
+
+8. Run NVIDIA's official sample before using `nvafx-audio-cli`:
+
+   ```bash
+   cd /opt/nvidia/Audio_Effects_SDK/samples/effects_demo
+   export LD_LIBRARY_PATH=external/cuda/lib:$LD_LIBRARY_PATH
+   ./run_effect.sh -g t4 -s 48 -e denoiser
+   ```
+
+   Replace `t4` with the correct supported GPU option for your environment.
+
+   ```text
+   If NVIDIA's own sample fails, stop. Fix NVIDIA SDK / driver / GPU runtime first.
+   Do not proceed to nvafx-audio-cli.
+   ```
+
+9. Build and install the SDK-enabled local wrapper:
+
+   ```bash
+   git clone https://github.com/tsuchim/nvafx-audio-cli.git
+   cd nvafx-audio-cli
+
+   python3 scripts/build_linux_sdk_local.py \
+     --sdk-root /opt/nvidia/Audio_Effects_SDK \
+     --model "$MODEL" \
+     --install-prefix "$HOME/.local" \
+     --run-test
+   ```
+
+10. Verify the correct command is being used:
+
+   ```bash
+   export PATH="$HOME/.local/bin:$PATH"
+
+   which nvafx-audio-cli
+   nvafx-audio-cli --version
+   nvafx-audio-cli --help | grep 'SDK processing in this binary'
+   ```
+
+   Expected:
+
+   ```text
+   $HOME/.local/bin/nvafx-audio-cli
+   SDK processing in this binary: enabled
+   ```
+
+11. Process a 48 kHz mono WAV file:
+
+    ```bash
+    nvafx-audio-cli \
+      --input input-48k-mono.wav \
+      --output output-denoised.wav \
+      --effect denoiser \
+      --sample-rate 48000 \
+      --intensity 1.0
+    ```
+
+12. Process stdin/stdout:
+
+    ```bash
+    cat input-48k-mono.wav | nvafx-audio-cli \
+      --input - \
+      --output - \
+      --effect denoiser \
+      --sample-rate 48000 \
+      --intensity 1.0 \
+      --allow-unsafe-pipe \
+      > output-denoised.wav
+    ```
+
 ## Linux SDK-Enabled Local Helper
 
 Use an externally extracted NVIDIA Audio Effects SDK. Do not vendor or commit SDK files, feature libraries, models, CUDA redistributables, generated media, or sample media.
