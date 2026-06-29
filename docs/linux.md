@@ -97,12 +97,36 @@ account.
 
 Continue only after the Artifacts tab is visible for your account.
 
-1. Download the SDK base package from the Artifacts tab.
+1. Download the SDK base package from the Artifacts tab. Use the actual filename shown in the Artifacts tab; do not invent a fixed package name.
 2. Extract the SDK under `/opt/nvidia`.
+
+   For a `.tar.gz` artifact:
+
+   ```bash
+   sudo mkdir -p /opt/nvidia
+   sudo tar xvf ~/Downloads/<downloaded-sdk-archive>.tar.gz -C /opt/nvidia
+   ls -la /opt/nvidia
+   ```
+
+   For a `.zip` artifact:
+
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y --no-install-recommends unzip
+   sudo unzip ~/Downloads/<downloaded-sdk-archive>.zip -d /opt/nvidia
+   ls -la /opt/nvidia
+   ```
+
 3. Make the final canonical path:
 
    ```text
    /opt/nvidia/Audio_Effects_SDK
+   ```
+
+   If the archive extracts to a versioned directory, create a canonical symlink:
+
+   ```bash
+   sudo ln -s /opt/nvidia/<actual-extracted-sdk-directory> /opt/nvidia/Audio_Effects_SDK
    ```
 
 4. Verify SDK contents:
@@ -124,7 +148,10 @@ Continue only after the Artifacts tab is visible for your account.
 7. Set the model path:
 
    ```bash
-   MODEL="$(find /opt/nvidia/Audio_Effects_SDK -name 'denoiser_48k.trtpkg' | head -n 1)"
+   MODEL="$(find /opt/nvidia/Audio_Effects_SDK -name 'denoiser_48k.trtpkg' -print -quit)"
+   if [ -z "$MODEL" ]; then
+     MODEL="$(find /opt/nvidia/Audio_Effects_SDK -name 'denoiser_48k_*.trtpkg' -print -quit)"
+   fi
    echo "$MODEL"
    test -n "$MODEL"
    ```
@@ -133,7 +160,7 @@ Continue only after the Artifacts tab is visible for your account.
 
    ```bash
    cd /opt/nvidia/Audio_Effects_SDK/samples/effects_demo
-   export LD_LIBRARY_PATH=external/cuda/lib:$LD_LIBRARY_PATH
+   export LD_LIBRARY_PATH=/opt/nvidia/Audio_Effects_SDK/external/cuda/lib:${LD_LIBRARY_PATH:-}
    ./run_effect.sh -g t4 -s 48 -e denoiser
    ```
 
